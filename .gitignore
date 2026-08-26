@@ -24,7 +24,18 @@ share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-files/
+# WAS a bare `files/`, which matches a directory of that name AT ANY DEPTH --
+# including roles/<role>/files/, the standard Ansible role directory. Four
+# roles' payloads were therefore never committed and survived only in one
+# machine's working tree; build_tarball.sh packs from the working directory, so
+# the tarball was correct there and empty for anyone who cloned. ss-pp-so was
+# created by `git clone` and got none of it: pp-www failed all three attempts
+# on 2026-08-26 with "Could not find or access 'app/'".
+#
+# Anchored to the repo root so it still excludes the pre-staged installer dir
+# it was added for (an 88MB aue-agent .exe once lived there) without swallowing
+# role content.
+/files/
 MANIFEST
 
 # PyInstaller
