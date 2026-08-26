@@ -1,6 +1,11 @@
 ansible_connection: winrm
 ansible_winrm_transport: ntlm
 ansible_port: 5985
+# SERVERS ONLY in practice. [win10] and [win11] override ansible_user,
+# ansible_password and ansible_become_user for the 36 workstations -- see
+# group_vars/win10.yml. ansible_become_user must always track ansible_user:
+# `runas` has no separate become password, so a mismatch authenticates the
+# connection and then fails the privilege escalation.
 ansible_user: simspace
 ansible_password: "{{ vault_windows_password }}"
 ansible_python_interpreter: python
