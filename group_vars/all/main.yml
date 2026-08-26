@@ -121,3 +121,26 @@ global_dns_records:
     priority: 10
     value: "mail.outlook.com"
     zone: "outlook.com"
+
+# Windows 10/11 workstation local account (xadmin), used by group_vars/win10.yml
+# and group_vars/win11.yml. The 2026-08-26 image refresh changed the account
+# the workstation images ship; the server images still use simspace /
+# vault_domain-era credentials from vault.yml.
+#
+# INLINE-VAULTED HERE rather than added to vault.yml, deliberately. It was
+# produced with `ansible-vault encrypt_string`, which emits a single encrypted
+# value instead of re-encrypting the whole file. Two reasons that matters:
+# a ~6-line paste instead of 3KB moving through a chat window, and zero risk of
+# corrupting the credentials in vault.yml that already work. It decrypts with
+# the same platform-placed /home/simspace/.vault_pass, so it is equivalent at
+# run time -- only the packaging differs.
+#
+# If you later consolidate this into vault.yml, delete it from here in the same
+# commit. Two definitions of one variable is a silent precedence puzzle.
+vault_win_workstation_password: !vault |
+          $ANSIBLE_VAULT;1.1;AES256
+          61303261393531363463373439653439386633623835633639353661623331333833343437343733
+          3234393962656633333337346162393637613239633462300a313131366562626535653331303663
+          37316535633466393038653335386461623034663737376131376361353465623666663135353737
+          3332366638663837630a356335383735643333356138623965653837353330383637346131343239
+          38633362366638313233643636373666643939306264666466313430366462306566
