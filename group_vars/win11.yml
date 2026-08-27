@@ -1,9 +1,10 @@
 ---
 # Windows 11 workstation images ship a DIFFERENT local account than the server
-# images, as of the 2026-08-26 blueprint refresh in this repo.
+# images, as of the 2026-08-26 blueprint refresh in this repo. Membership verified
+# against WORK_DIR/ARB_PP_DO_001.yml the same day.
 #
 # Child-group vars override parent-group vars, so these three beat the
-# simspace baseline in group_vars/windows.yml for exactly the 11 hosts in
+# simspace baseline in group_vars/windows.yml for exactly the 13 hosts in
 # [win11] and nothing else. The servers keep simspace / vault_windows_password.
 #
 # NOTE THE DIFFERENCE FROM ss-pp-ab, which carries the same credential split
