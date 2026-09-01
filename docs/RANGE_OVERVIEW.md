@@ -8,7 +8,7 @@ Most SIEM training environments treat the network as a backdrop. Logs arrive,
 analysts triage them, and nothing an attacker does is constrained by where they
 are.
 
-**Voltgrid is built the other way round.** A 72-host power utility with a real
+**Voltgrid is built the other way round.** A 75-host power utility with a real
 Active Directory forest, a real DMZ, and a genuinely segmented OT enclave
 running gas-turbine plant equipment. Three Security Onion sensors watch it from
 three different vantage points — and *which sensor sees an event tells you
@@ -26,7 +26,7 @@ manager, a search node and three sensors. Suricata and Zeek on every mirrored
 segment. Elastic Agent on 42 Windows endpoints feeding process and file
 telemetry into the same platform.
 
-**Six analyst positions**, on their own segment, with tooling ready — and
+**Six analyst positions plus a forensics bench** — SIFT, REMnux and FLARE on the same segment — with tooling ready — and
 deliberately excluded from the emulated-user population, so an analyst's own
 activity never contaminates the host they investigate from.
 
@@ -64,7 +64,7 @@ up, run the exercise, rebuild it clean.
 
 | | |
 |---|---|
-| **Scale** | 72 hosts across 13 host-bearing segments, plus 7 point-to-point transit links |
+| **Scale** | 75 hosts across 13 host-bearing segments, plus 7 point-to-point transit links |
 | **Identity** | `voltgrid.com` — three domain controllers, 40 domain members, 32 emulated users |
 | **Corporate** | Services, Business Processing, Engineering, Legal, InfoSec |
 | **Perimeter** | DMZ with public web, DNS and mail; simulated Internet beyond |

@@ -16,7 +16,7 @@ work.
 
 | | |
 |---|---|
-| **Hosts** | 72 |
+| **Hosts** | 75 |
 | **AD forest** | `voltgrid.com`, three domain controllers, 40 domain members |
 | **Corporate segments** | Services, Business Processing, Engineering, Legal, InfoSec |
 | **OT enclave** | Four segments behind a dedicated firewall — control, turbine, turbine-sim, OT services |
@@ -112,7 +112,7 @@ graph TB
 | Legal | 172.16.5.0/24 | 6 workstations |
 | InfoSec | 172.16.6.0/24 | 4 workstations |
 | DMZ | 172.16.8.0/24 | `pp-www`, `pp-dmz-dns`, `pp-dmz-smtp` |
-| Security | 172.16.9.0/24 | SO grid, 6 hunt workstations |
+| Security | 172.16.9.0/24 | SO grid, 6 hunt workstations, 3 forensics VMs |
 | OT-Ctrl | 192.168.100.0/24 | `pp-dc03`, `pp-dcs-ctrl`, `pp-ctl-wks-01..04` |
 | Gas-Turbine | 192.168.95.0/24 | Plant equipment |
 | Gas-Turbine-Sim | 192.168.90.0/27 | Simulation |
@@ -279,6 +279,50 @@ those hosts are monitored like any other endpoint.
 
 ---
 
+## Forensics and malware analysis tooling
+
+Three analyst VMs on the security segment:
+
+| Host | Address | Purpose | Telemetry |
+|---|---|---|---|
+| `pp-sift` | 172.16.9.101 | SANS Investigative Forensic Toolkit — disk and memory analysis | none currently; a candidate for enrolment |
+| `pp-remnux` | 172.16.9.100 | Malware analysis (Linux) | **none, deliberately** |
+| `pp-flare` | 172.16.9.102 | Malware analysis (Windows) | **none, deliberately** |
+
+All three are in `[forensics]`, a label group no play targets. `pp-remnux` and
+`pp-flare` are additionally in `[unmanaged]`, which is what excludes them from
+`75-endpoint.yml`.
+
+**Why the detonation hosts are not instrumented.** Sysmon and Elastic Agent on
+a box whose purpose is executing malware emit process trees, network
+connections and file writes indistinguishable from an intrusion — because they
+are one, just an authorised one. Enrolling them would feed instructor activity
+into the SIEM students are hunting in, producing the most convincing false
+positives available. `pp-sift` is the opposite case: it analyses evidence,
+executes nothing hostile, and holds the investigation's work product, which
+makes it a target worth monitoring. It is not enrolled yet — see `hosts` for
+the three prerequisites.
+
+### Adjacency — read before running live samples
+
+`pp-remnux` and `pp-flare` share layer 2 with `so-manager`, `so-search`, all
+three sensors, `pp-splunk` and the six hunt workstations. A sample with
+worm-like behaviour reaches every one of them **without traversing a router**,
+so no firewall rule or routing change constrains it.
+
+This is acceptable for static analysis — strings, unpacking, disassembly,
+memory forensics — which is how these hosts are expected to be used. It is
+**not** acceptable for uncontrolled detonation. If live execution becomes part
+of exercise design, the correct fix is a dedicated analysis subnet behind
+`pp-internal-firewall` with no path to `pp-security`; nothing short of a
+separate segment contains same-subnet propagation.
+
+Note also that the security segment is not a `vyos_mirror` source, so no sensor
+captures traffic on it. Activity between these hosts and the SO grid is
+invisible at the network layer.
+
+---
+
 ## Generating attacks
 
 Two sources, usable independently or together.
@@ -409,14 +453,14 @@ until timeout and looks like an unbooted host.
 | `ansible` | 10.10.10.10 | — | ansible_controller |
 | `elgg` | 200.200.200.205 | Internet (sim) | unmanaged |
 | `is-inet` | 200.200.200.2 | Internet (sim) | email |
-| `pp-bp-wkstn-1` | 172.16.3.10 | Business Processing | workstation |
-| `pp-bp-wkstn-2` | 172.16.3.3 | Business Processing | workstation |
-| `pp-bp-wkstn-3` | 172.16.3.4 | Business Processing | workstation |
-| `pp-bp-wkstn-4` | 172.16.3.5 | Business Processing | workstation |
-| `pp-bp-wkstn-5` | 172.16.3.6 | Business Processing | workstation |
-| `pp-bp-wkstn-6` | 172.16.3.7 | Business Processing | workstation |
-| `pp-bp-wkstn-7` | 172.16.3.8 | Business Processing | workstation |
-| `pp-bp-wkstn-8` | 172.16.3.9 | Business Processing | workstation |
+| `pp-bp-wkstn-1` | 172.16.3.10 | Business Processing | workstation / member |
+| `pp-bp-wkstn-2` | 172.16.3.3 | Business Processing | workstation / member |
+| `pp-bp-wkstn-3` | 172.16.3.4 | Business Processing | workstation / member |
+| `pp-bp-wkstn-4` | 172.16.3.5 | Business Processing | workstation / member |
+| `pp-bp-wkstn-5` | 172.16.3.6 | Business Processing | workstation / member |
+| `pp-bp-wkstn-6` | 172.16.3.7 | Business Processing | workstation / member |
+| `pp-bp-wkstn-7` | 172.16.3.8 | Business Processing | workstation / member |
+| `pp-bp-wkstn-8` | 172.16.3.9 | Business Processing | workstation / member |
 | `pp-corp-router` | 172.16.2.1 | Services | vyos |
 | `pp-ctl-wks-01` | 192.168.100.101 | OT-Ctrl | ot_control |
 | `pp-ctl-wks-02` | 192.168.100.102 | OT-Ctrl | ot_control |
@@ -428,38 +472,41 @@ until timeout and looks like an unbooted host.
 | `pp-dcs-ctrl` | 192.168.100.10 | OT-Ctrl | ot_servers |
 | `pp-dmz-dns` | 172.16.8.4 | DMZ | dmz |
 | `pp-dmz-smtp` | 172.16.8.3 | DMZ | dmz |
-| `pp-eng-wkstn-1` | 172.16.4.10 | Engineering | workstation |
-| `pp-eng-wkstn-2` | 172.16.4.3 | Engineering | workstation |
-| `pp-eng-wkstn-3` | 172.16.4.4 | Engineering | workstation |
-| `pp-eng-wkstn-4` | 172.16.4.5 | Engineering | workstation |
-| `pp-eng-wkstn-5` | 172.16.4.6 | Engineering | workstation |
-| `pp-eng-wkstn-6` | 172.16.4.7 | Engineering | workstation |
-| `pp-eng-wkstn-7` | 172.16.4.8 | Engineering | workstation |
-| `pp-eng-wkstn-8` | 172.16.4.9 | Engineering | workstation |
+| `pp-eng-wkstn-1` | 172.16.4.10 | Engineering | workstation / member |
+| `pp-eng-wkstn-2` | 172.16.4.3 | Engineering | workstation / member |
+| `pp-eng-wkstn-3` | 172.16.4.4 | Engineering | workstation / member |
+| `pp-eng-wkstn-4` | 172.16.4.5 | Engineering | workstation / member |
+| `pp-eng-wkstn-5` | 172.16.4.6 | Engineering | workstation / member |
+| `pp-eng-wkstn-6` | 172.16.4.7 | Engineering | workstation / member |
+| `pp-eng-wkstn-7` | 172.16.4.8 | Engineering | workstation / member |
+| `pp-eng-wkstn-8` | 172.16.4.9 | Engineering | workstation / member |
 | `pp-engws` | — | — | unmanaged |
 | `pp-external-firewall` | 10.255.240.191 | — | pfsense |
 | `pp-file` | 172.16.2.3 | Services | file |
+| `pp-flare` | 172.16.9.102 | Security | forensics |
 | `pp-gas-sim` | — | — | unmanaged |
 | `pp-gasplant-plc` | — | — | unmanaged |
 | `pp-gasvibsens` | — | — | unmanaged |
 | `pp-internal-firewall` | 10.255.240.197 | — | pfsense |
 | `pp-internal-router` | 172.16.9.1 | Security | vyos |
-| `pp-is-wkstn-1` | 172.16.6.10 | InfoSec | workstation |
-| `pp-is-wkstn-2` | 172.16.6.3 | InfoSec | workstation |
-| `pp-is-wkstn-3` | 172.16.6.4 | InfoSec | workstation |
-| `pp-is-wkstn-4` | 172.16.6.5 | InfoSec | workstation |
+| `pp-is-wkstn-1` | 172.16.6.10 | InfoSec | workstation / member |
+| `pp-is-wkstn-2` | 172.16.6.3 | InfoSec | workstation / member |
+| `pp-is-wkstn-3` | 172.16.6.4 | InfoSec | workstation / member |
+| `pp-is-wkstn-4` | 172.16.6.5 | InfoSec | workstation / member |
 | `pp-isp-router` | 75.21.1.2 | ISP | vyos |
-| `pp-ls-wkstn-1` | 172.16.5.10 | Legal | workstation |
-| `pp-ls-wkstn-2` | 172.16.5.3 | Legal | workstation |
-| `pp-ls-wkstn-3` | 172.16.5.4 | Legal | workstation |
-| `pp-ls-wkstn-4` | 172.16.5.5 | Legal | workstation |
-| `pp-ls-wkstn-5` | 172.16.5.6 | Legal | workstation |
-| `pp-ls-wkstn-6` | 172.16.5.7 | Legal | workstation |
+| `pp-ls-wkstn-1` | 172.16.5.10 | Legal | workstation / member |
+| `pp-ls-wkstn-2` | 172.16.5.3 | Legal | workstation / member |
+| `pp-ls-wkstn-3` | 172.16.5.4 | Legal | workstation / member |
+| `pp-ls-wkstn-4` | 172.16.5.5 | Legal | workstation / member |
+| `pp-ls-wkstn-5` | 172.16.5.6 | Legal | workstation / member |
+| `pp-ls-wkstn-6` | 172.16.5.7 | Legal | workstation / member |
 | `pp-mail` | 172.16.2.5 | Services | workstation / member |
 | `pp-ot-firewall` | 10.255.240.190 | — | pfsense |
 | `pp-ot-hist` | — | — | unmanaged |
 | `pp-ot-router` | 192.168.200.202 | — | vyos_routes_only |
 | `pp-proxy` | 172.16.2.20 | Services | proxy |
+| `pp-remnux` | 172.16.9.100 | Security | forensics |
+| `pp-sift` | 172.16.9.101 | Security | forensics |
 | `pp-splunk` | 172.16.9.20 | Security | workstation / member |
 | `pp-sql` | 172.16.2.4 | Services | workstation / member |
 | `pp-syslog` | 172.16.2.9 | Services | syslog |

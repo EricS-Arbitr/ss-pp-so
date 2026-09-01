@@ -479,6 +479,40 @@ ansible ansible_connection=local
 pp-proxy
 
 # ------------------------------------------------------------
+# Forensics / malware analysis tooling — pp-security subnet
+# ------------------------------------------------------------
+# Label group. No play targets it; it exists so these hosts are recorded
+# rather than invisible. A host absent from inventory is a host nobody
+# reasons about -- see pp-dcs-ctrl, which sat with no telemetry for months
+# because [ot_servers] was never made a child of [splunk-forwarder].
+#
+# TELEMETRY POSTURE, decided 2026-09-01: instrument what ANALYSES, not what
+# DETONATES.
+#   pp-sift    evidence host (disk/memory images, timelines). Executes
+#              nothing hostile and holds the investigation's work product,
+#              so it is a high-value target and SHOULD carry an agent --
+#              the same argument recorded for [hunt] above. Not yet
+#              enrolled: see the note below.
+#   pp-remnux  detonation host -> [unmanaged], not enrolled
+#   pp-flare   detonation host -> [unmanaged], not enrolled
+#
+# TO ENROL pp-sift, three things are needed and none are assumed here:
+#   1. host_vars/pp-sift.yml with ansible_host and working credentials --
+#      the RDP_SIFT image may not carry the simspace account group_vars/
+#      linux.yml expects.
+#   2. a decision NOT to add it to [linux]: that group pulls in the `common`
+#      role, which performs a systemd-networkd -> NetworkManager cutover, a
+#      netplan overwrite and a reboot. Appropriate for a range-built Ubuntu
+#      host, not for a vendor forensics appliance.
+#   3. adding `forensics` to the enrol pattern in playbooks/75-endpoint.yml
+#      (`windows:linux:!unmanaged:!so_all`), which then picks up pp-sift and
+#      still excludes the two detonation hosts via [unmanaged].
+[forensics]
+pp-sift
+pp-remnux
+pp-flare
+
+# ------------------------------------------------------------
 # Unmanaged systems — hard-coded, NOT targeted by any Ansible play.
 # Contains specialized pre-built appliances (OT PLCs/HMIs + the elgg
 # social-platform vuln host) that self-configure from their images.
@@ -490,6 +524,16 @@ pp-gasvibsens
 pp-ot-hist
 pp-engws
 elgg
+# Malware analysis hosts, added 2026-09-01. DELIBERATELY unmanaged, and the
+# reason is telemetry rather than configuration: both exist to execute
+# malware. Sysmon and Elastic Agent on a detonation box emit process trees,
+# network connections and file writes that are indistinguishable from an
+# intrusion -- because they are one, just an authorised one. Enrolling them
+# would feed instructor activity into the SIEM students are hunting in.
+# playbooks/75-endpoint.yml excludes [unmanaged], so this placement is what
+# keeps them out; no play change is needed.
+pp-remnux
+pp-flare
 
 [aue]
 pp-bp-wkstn-1
