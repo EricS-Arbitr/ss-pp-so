@@ -163,17 +163,17 @@ The plant devices are **unmanaged** — they arrive pre-configured from their
 images and Ansible does not touch them, exactly as real plant equipment behaves
 under a corporate config-management regime.
 
-`pp-dcs-ctrl`, the DCS control station, is fully instrumented here — Sysmon
-and endpoint telemetry like any other Windows host. That is a deliberate range
-choice: practitioners get complete visibility into an intrusion that reaches
-process-control equipment, which is where the training value is.
+`pp-dcs-ctrl`, the DCS control station, forwards Windows event logs but runs
+**no Sysmon**, deliberately. The line is *instrument versus observe*: Sysmon
+instruments the OS with a kernel driver and process-level hooks, which does not
+belong on process-critical equipment, while a log forwarder only reads what
+Windows already writes. That is how conservative OT programmes actually behave.
 
-It is worth knowing that this is *more* visibility than a conservative real-world
-OT programme would allow. Many shops will not put a kernel-driver agent on
-process-critical equipment and settle for log forwarding alone. If you want to
-run an exercise under that constraint, removing `pp-dcs-ctrl` from Sysmon
-coverage is a one-line inventory change and makes the OT enclave meaningfully
-harder to investigate.
+For practitioners it means the most sensitive host in the range gives realistic
+rather than total visibility — logons, account use and service installs, but no
+process tree. An intrusion that reaches the control station has to be
+reconstructed from network evidence on `so-sensor-ot` and Windows events,
+which is exactly the problem a real OT investigation presents.
 
 ---
 
@@ -213,9 +213,15 @@ Which sensor carries an event tells a defender where the adversary is.
 ### Endpoint telemetry
 
 Elastic Agents on Windows and Linux endpoints enrol into SO's Fleet, so process
-and file activity sits alongside network evidence. **Sysmon runs on all 45
-Windows hosts** — every domain member, both DMZ servers, the OT control
-station, and the six analyst workstations.
+and file activity sits alongside network evidence. **Sysmon runs on 42 of the
+45 Windows hosts**, driven by the `[sysmon]` inventory group. Three are
+excluded on purpose: `pp-dcs-ctrl` for the reason below, and `pp-dmz-dns` and
+`pp-dmz-smtp`, which sit outside the forest and outside the corporate telemetry
+contract.
+
+Coverage is a group rather than a host pattern so that "does this host produce
+endpoint telemetry" is a decision someone recorded, not a side effect of who
+happens to run emulated users.
 
 ### Access
 
@@ -339,19 +345,24 @@ before it can break routing. Seeing it is good; it means the guard is working.
 
 ## Credentials
 
-> Passwords live in `group_vars/all/vault.yml`. Retrieve them on the controller
-> with `./vault-tools.sh view`, or `sudo ansible-vault view
-> group_vars/all/vault.yml`.
+> Passwords are stored in `group_vars/all/vault.yml` (Ansible Vault). The
+> values below are the current range defaults. **Rotate them before any
+> deployment that is not a lab.**
 
-| System | Username | Password |
-|---|---|---|
-| Security Onion SOC | `admin@voltgrid.com` | `vault_so_web_password` |
-| Domain admin | `simspace` | `vault_domain_admin_password` |
-| Windows servers | `simspace` | `vault_windows_password` |
-| Windows 10/11 workstations | `xadmin` | `vault_win_workstation_password` |
-| Linux hosts | `simspace` | `vault_linux_password` |
-| pfSense firewalls | `admin` | `vault_pfsense_password` |
-| VyOS routers | `vyos` | `vault_vyos_password` |
+| System | Access | Username | Password |
+|---|---|---|---|
+| Security Onion SOC | `https://172.16.9.30` | `admin@voltgrid.com` | `Simspace1!Simspace1!` |
+| Domain admin | `voltgrid.com` | `simspace` | `Simspace1!Simspace1!` |
+| Domain users | `voltgrid.com` | see emulated identities | `Simspace1!Simspace1!` |
+| Windows servers | RDP / WinRM | `simspace` | `Simspace1!Simspace1!` |
+| Windows 10/11 workstations | RDP / WinRM | `xadmin` | `ConfigingInTheNameOf1!` |
+| Linux hosts | SSH | `simspace` | `simspace1` |
+| pfSense firewalls | SSH / web | `admin` | `simspace1` |
+| VyOS routers | SSH | `vyos` | `Simspace1!` |
+| SO node join secret | — | — | `Simspace1!Simspace1!` |
+
+Analyst workstations `win-hunt-1..6` autologin, so a practitioner sitting at
+one has a desktop without needing credentials.
 
 Workstation and server credentials differ — the workstation images ship a
 different local account. Using the wrong one does not fail fast; it retries

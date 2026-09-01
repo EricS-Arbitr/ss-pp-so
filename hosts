@@ -353,6 +353,36 @@ pp-splunk
 pp-syslog
 
 
+# ------------------------------------------------------------
+# Endpoint telemetry — Sysmon
+# ------------------------------------------------------------
+# Brought in line with ss-pp-ab 2026-09-01. Previously Sysmon was applied by
+# playbooks/75-endpoint.yml with `hosts: windows`, i.e. all 45 Windows hosts
+# with no exclusions. Coverage is now an explicit group, so "does this host
+# produce endpoint telemetry" is a decision someone wrote down rather than a
+# side effect of a host pattern.
+#
+# pp-dcs-ctrl (OT control station) is EXCLUDED by decision. The line is
+# INSTRUMENT vs OBSERVE: Sysmon instruments the OS with a kernel driver and
+# process-level hooks, which does not belong on process-critical OT equipment.
+# It still forwards Windows event logs -- a forwarder only reads what Windows
+# already writes, which is ordinary practice even on an HMI.
+#
+# pp-dmz-dns and pp-dmz-smtp are also absent, matching ss-pp-ab. They are
+# outside the forest and outside the corporate telemetry contract.
+[sysmon]
+pp-file
+pp-sql
+pp-mail
+pp-dc01
+pp-dc02
+pp-dc03
+
+[sysmon:children]
+aue
+hunt
+
+
 [splunk-forwarder]
 pp-proxy
 # SOC hunt/analyst workstations. Added 2026-08-17 -- an attacker who lands on

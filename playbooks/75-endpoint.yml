@@ -28,8 +28,13 @@
 # against the AUE boxes that already have it is a no-op. Installer comes from
 # the in-platform Nexus already configured in group_vars/windows.yml -- the
 # established convention in this range, and not an egress dependency.
-- name: Sysmon on every Windows host (was AUE-only)
-  hosts: windows
+# Coverage is the [sysmon] inventory group, not `hosts: windows`. Brought in
+# line with ss-pp-ab 2026-09-01: pp-dcs-ctrl is excluded by decision (OT
+# control station — INSTRUMENT vs OBSERVE, see hosts), and the DMZ pair sits
+# outside the corporate telemetry contract. A host pattern cannot express
+# "everything except these three, on purpose"; a group can.
+- name: Endpoint telemetry — Sysmon
+  hosts: sysmon
   gather_facts: false
   strategy: free          # independent per-host installs; no cross-host sync
   roles:
@@ -43,7 +48,7 @@
 # the service state, per the standing rule in this repo about checks that
 # cannot fail.
 - name: Verify the Sysmon service is running
-  hosts: windows
+  hosts: sysmon
   gather_facts: false
   tasks:
     - name: Query the Sysmon64 service
