@@ -1,23 +1,14 @@
-# Voltgrid Power — Range Guide
+# ss-pp-so — Range Reference
 
-**A small electric utility, fully instrumented, under attack.**
+Technical reference for the `voltgrid.com` power-utility range: topology,
+telemetry coverage, deployment procedure and verification.
 
-`ss-pp-so` is a cyber range built around a fictional power company:
-`voltgrid.com`. It has the things a real small utility has — an Active
-Directory forest, departmental workstations, a public web presence, a mail
-server — and the thing that makes it interesting: a genuine OT enclave running
-gas-turbine plant equipment, separated from the corporate network by a firewall
-boundary that an attacker has to cross.
+Audience: range operators and instructors. Assumes working knowledge of
+Security Onion, Active Directory and Ansible.
 
-Every packet that matters is mirrored into **Security Onion**, and every
-Windows endpoint reports to it. Defenders get a real SIEM watching a real
-network, and a red team — automated, manual, or both — that gives them
-something to find.
-
-**Who this is for:** range operators and instructors. It assumes you know
-Security Onion. It covers what the range contains, what the sensors see, how to
-stand it up, how to tell it is healthy, and what to expect once practitioners
-are inside it.
+Scope: this document covers the range as built by `ss-pp-so`. Splunk is
+deployed here but out of scope pending the Splunk/Security Onion integration
+work.
 
 ---
 
@@ -38,22 +29,30 @@ are inside it.
 
 ---
 
-## Why this range
+## Design constraints
 
-Most SIEM training environments have one flaw: the network is a backdrop. Logs
-arrive, analysts triage them, and nothing an attacker does is constrained by
-topology.
+Four properties of the build determine what practitioners can and cannot see.
+They are stated here because several downstream behaviours only make sense
+against them.
 
-This one is built the other way round. The OT enclave is genuinely segmented,
-the DMZ is genuinely exposed, and the sensor placement means **what a defender
-can see depends on where the attacker is**. An intrusion that stays in the DMZ
-looks different from one that reaches the control network, because different
-sensors carry it. That makes lateral movement legible rather than theoretical,
-and it makes segmentation something practitioners reason about instead of
-something they read about.
+**Sensor coverage is positional.** Each sensor receives a mirror from exactly
+one router, so an event is visible only to the sensor whose router carries it.
+red-net traffic reaches `so-sensor-edge` alone; corporate traffic reaches
+`so-sensor-corp`; OT traffic reaches `so-sensor-ot`. There is no aggregation
+tap. Correlating an intrusion across segments requires correlating across
+sensors.
 
-Add 32 emulated users producing real background noise, and detections have to
-survive contact with a network that is already busy.
+**The OT enclave is segmented at layer 3.** `pp-ot-firewall` is the boundary and
+OT reaches corporate over static routes only. `pp-dc03` sits inside the enclave
+so OT hosts authenticate locally, which means routine identity traffic does not
+cross the boundary.
+
+**Endpoint telemetry is not uniform.** 42 of 45 Windows hosts run Sysmon. The
+three exclusions are deliberate and documented in `hosts`.
+
+**The network is not quiet.** 32 emulated users generate browsing, file and
+process activity continuously across the corporate segments. Detection logic
+that depends on a low-noise baseline will not behave as it does in a lab.
 
 ---
 
@@ -121,10 +120,17 @@ graph TB
 | Internet (sim) | 200.200.200.0/24 | `is-inet`, `elgg` |
 | red-net | 210.210.210.0/24 | `Red-1`, Activity-Emulation |
 
-Routing is OSPF area 0 across the corporate core with eBGP at the ISP edge.
-The OT enclave sits behind `pp-ot-firewall` and reaches corporate over static
-routes — an attacker crossing that boundary is making a routing decision a
-sensor can see.
+### Routing
+
+| Domain | Protocol | Notes |
+|---|---|---|
+| Corporate core | OSPF area 0 | Enabled per-interface on `pp-corp-router`, `pp-internal-router`, `site-edge-router` and the pfSense firewalls |
+| ISP edge | eBGP | `pp-external-firewall` (AS 65001) to `pp-isp-router` (AS 65002) — the only BGP session in the fabric |
+| OT enclave | Static | `pp-ot-firewall` is the boundary; corporate reaches `192.168.0.0/16` via static route, OT reaches corporate via default |
+
+The three pfSense firewalls run FRR. `pp-external-firewall` redistributes OSPF
+into BGP but **not** connected routes, which keeps the management plane out of
+the ISP-facing advertisement.
 
 ---
 
@@ -169,11 +175,10 @@ instruments the OS with a kernel driver and process-level hooks, which does not
 belong on process-critical equipment, while a log forwarder only reads what
 Windows already writes. That is how conservative OT programmes actually behave.
 
-For practitioners it means the most sensitive host in the range gives realistic
-rather than total visibility — logons, account use and service installs, but no
-process tree. An intrusion that reaches the control station has to be
-reconstructed from network evidence on `so-sensor-ot` and Windows events,
-which is exactly the problem a real OT investigation presents.
+Practical consequence: on `pp-dcs-ctrl` you have Windows event data — logons,
+account use, service installs — and network evidence from `so-sensor-ot`, but
+no process tree and no Sysmon network or DNS events. Activity on that host must
+be reconstructed from those two sources.
 
 ---
 
@@ -191,8 +196,33 @@ Distributed 2.4 grid on the security segment:
 
 ### What each sensor sees
 
-Traffic is mirrored from the routers into `gretap` tunnels — layer 2, so Zeek
-receives real Ethernet frames and produces connection logs rather than silence.
+### Mirror implementation
+
+Traffic is copied from router interfaces into `gretap` tunnels with `tc mirred`.
+
+| Property | Value |
+|---|---|
+| Encapsulation | `gretap` (layer 2) — Zeek's AF_PACKET plugin requires Ethernet frames; a layer-3 `gre` tunnel yields `DLT_RAW` and produces zero connection logs while Suricata continues to alert |
+| Tunnel MTU | 1462 — 1500 less 20 (outer IP), 4 (GRE), 14 (inner Ethernet) |
+| Mechanism | `tc` ingress and root `prio` qdiscs per source interface, `matchall action mirred egress mirror dev tun0` |
+| Persistence | `/config/scripts/vyatta-postconfig-bootup.script`, re-applied at boot |
+| Exclusions | `10.255.240.0/20` passed on src and dst ahead of the mirror |
+
+The management plane shares a data-plane interface on these routers, so each
+mirrored interface carries two `action pass` filters at lower priority than the
+`mirred` catch-all. On `pp-corp-router` that keeps the Services subnet
+(`pp-dc01`, `pp-dc02`, `pp-sql`, `pp-file`, `pp-mail`) in coverage while
+excluding orchestration traffic that does not exist in-scenario.
+
+Verify with the absolute path — `tc` is not on the `vyos` user's PATH, and a
+bare invocation returns "command not found" that a counting grep renders
+indistinguishable from "no filters":
+
+```
+/sbin/tc filter show dev eth0 ingress
+```
+
+Expect one `mirred` filter and two `action pass` filters per source interface.
 
 | Sensor | Mirrors | Coverage |
 |---|---|---|
@@ -205,10 +235,11 @@ data-plane interface, so the mirror carries `action pass` rules for
 `10.255.240.0/20` ahead of the catch-all. Practitioners never see the
 orchestration plane, which does not exist in-scenario.
 
-This split is what makes the range teach segmentation. An attacker on red-net
-is visible only to `so-sensor-edge`. Reaching the DMZ or corporate brings
-`so-sensor-corp` into play. Crossing into the plant lights up `so-sensor-ot`.
-Which sensor carries an event tells a defender where the adversary is.
+Because each sensor is fed by exactly one router, sensor identity is a location
+signal: an event present on `so-sensor-ot` and absent from `so-sensor-corp`
+indicates traffic that did not cross the OT boundary. There is no aggregation
+point, so cross-segment activity must be correlated across sensors rather than
+read from a single stream.
 
 ### Endpoint telemetry
 
@@ -238,10 +269,9 @@ Six Windows 10 workstations on the security segment — `win-hunt-1` through
 `win-hunt-6`, `172.16.9.11–16` — with Chrome and autologin, positioned to reach
 the SOC interface directly.
 
-They are deliberately **not** running emulated users. Analyst boxes generating
-synthetic browsing would inject noise into the exact host a hunter is
-investigating from, and make their own tooling look adversary-shaped in their
-own telemetry.
+They are **not** in the `[aue]` group and run no emulated users, so analyst
+activity is not mixed with synthetic user activity on the hosts analysts work
+from.
 
 They do carry Sysmon and a log forwarder. An attacker who reaches an analyst
 workstation sees everything the SOC sees and can steer the investigation, so
