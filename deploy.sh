@@ -12,9 +12,19 @@
 # headroom (2-4 vCPU on the SimSpace VM); 40 concurrent workers is a
 # comfortable middle ground and matches the airfield-range deploy.sh.
 
-# site.yml = arbitr_pp_playbook.yaml (range baseline) followed by the six
-# Security Onion phases. Run a single phase directly during development —
-# re-running the full range playbook to test an SO change is slow.
+# site.yml is a WRAPPER, not a play in its own right. It imports
+# arbitr_pp_playbook.yaml (the range baseline, phase 0) and then the nine
+# Security Onion phases: 05-time, 10-mirror, 20-vyos, 30-prereqs,
+# 40-manager, 50-nodes, 60-verify, 70-analyst, 75-endpoint.
+#
+# Setting this to arbitr_pp_playbook.yaml would still run and still report
+# success -- while silently skipping every SO phase, including the mirror
+# the SO nodes fetch their source and container images from. Keep it
+# pointed at the wrapper.
+#
+# Run a single phase directly during development; re-running the full range
+# playbook to test an SO change is slow:
+#     ansible-playbook playbooks/40-manager.yml
 PLAYBOOK="site.yml"
 RETRY_FILE="retry/$PLAYBOOK.retry"
 MAX_ATTEMPTS=3
