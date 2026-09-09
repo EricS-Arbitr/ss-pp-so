@@ -80,7 +80,18 @@ so_fleet_integrations:
     # The matching squid.conf change is a post-play in
     # arbitr_pp_playbook.yaml (squid is a base role; workarounds are plays,
     # not role forks -- CLAUDE.md).
-    input: squid-udp
+    # Input key is <policy_template>-<input_type>, and squid`s policy
+    # template is named `log`, NOT `squid`. Confirmed against the package
+    # 2026-09-09 after the API rejected squid-udp with
+    # "Input not found: squid-udp". nginx happens to name its template after
+    # the package (nginx-logfile), which is what made the wrong assumption
+    # look right. Derive, do not pattern-match:
+    #   fleet_api "epm/packages/<pkg>" | jq -r '.item.policy_templates[]
+    #     | .name as $t | .inputs[] | "\($t)-\(.type)"'
+    #
+    # squid also offers log-filestream. Not used: squid emits over UDP to
+    # loopback, which sidesteps log rotation and file permissions entirely.
+    input: log-udp
     udp_host: "127.0.0.1"
     udp_port: 9537           # package default; no reason to move it
     verify_datastream: "logs-squid.log-default"
