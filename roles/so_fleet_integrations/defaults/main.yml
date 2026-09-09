@@ -33,6 +33,10 @@ so_fleet_json_dir: /opt/so/conf/arbitr-fleet
 # is generous for a check-in interval measured in seconds, and failing here
 # is the whole point of the step, so a short window would produce false
 # alarms rather than catching real ones.
+# 20 x 30s = 10 min. Long enough for an agent to check in, receive a new
+# policy and start collecting. NOT long enough to paper over a real fault:
+# on 2026-09-09 this failed honestly after 10 min because the host had been
+# assigned the wrong policy, which is the outcome we want from it.
 so_fleet_verify_retries: 20
 
 # Fleet policy defaults. inactivity_timeout matches SO's own endpoints-initial

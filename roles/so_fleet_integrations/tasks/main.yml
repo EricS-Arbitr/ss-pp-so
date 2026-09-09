@@ -102,9 +102,29 @@
 - name: Reassign the target host onto its dedicated policy
   ansible.builtin.shell: |
     . /usr/sbin/so-elastic-fleet-common
-    AID=$(fleet_api "agents?kuery=local_metadata.host.hostname:{{ item.1 }}" | jq -r "(.items // .list)[0].id // empty")
+    WANT="{{ item.1 }}"
+    # The kuery VALUE MUST be quoted (%22). Unquoted, KQL tokenises on the
+    # hyphen, so hostname:pp-www also matches pp-proxy and pp-syslog -- and
+    # taking [0] then picks an arbitrary one. On 2026-09-09 that
+    # cross-assigned the two hosts: pp-www landed on so-proxy and never ran
+    # the nginx input, which surfaced ten minutes later as DATA_NONE with
+    # nothing visibly wrong at either end.
+    #
+    # The jq select() is the real guard, not the quoting. A lookup that CAN
+    # return the wrong host must be made to prove it returned the right one,
+    # so we match the hostname exactly rather than trusting the query.
+    AID=$(fleet_api "agents?kuery=local_metadata.host.hostname:%22$WANT%22" \
+          | jq -r --arg h "$WANT" '(.items // .list)[]
+              | select(((.local_metadata.host.hostname // "") | ascii_downcase) == ($h | ascii_downcase))
+              | .id' | head -1)
     if [ -z "$AID" ]; then
-      echo "AGENT_NOT_FOUND {{ item.1 }}"
+      echo "AGENT_NOT_FOUND $WANT"
+      exit 0
+    fi
+    # Re-read the agent and confirm identity before mutating it.
+    GOT=$(fleet_api "agents/$AID" | jq -r ".item.local_metadata.host.hostname // empty")
+    if [ "$(echo "$GOT" | tr A-Z a-z)" != "$(echo "$WANT" | tr A-Z a-z)" ]; then
+      echo "AGENT_MISMATCH wanted=$WANT got=$GOT id=$AID"
       exit 0
     fi
     CUR=$(fleet_api "agents/$AID" | jq -r ".item.policy_id // empty")
@@ -122,6 +142,7 @@
   failed_when: >-
     'REASSIGN_FAILED' in so_fleet_reassign.stdout
     or 'AGENT_NOT_FOUND' in so_fleet_reassign.stdout
+    or 'AGENT_MISMATCH' in so_fleet_reassign.stdout
   loop: "{{ so_fleet_integrations | subelements('hosts') }}"
   loop_control:
     label: "{{ item.1 }} -> {{ item.0.policy }}"
