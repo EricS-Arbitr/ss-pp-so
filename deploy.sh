@@ -31,8 +31,11 @@ MAX_ATTEMPTS=3
 # FORKS is DERIVED, not chosen: it is the largest single play target plus a
 # small margin. Recomputed 2026-09-08.
 #
-#   largest play target : 54  (windows,linux)
-#   FORKS               : 56
+#   largest play target : 53  (windows,linux)
+#   FORKS               : 55
+#
+# Recounted 2026-09-09 after Splunk removal took pp-splunk out of [ubuntu22]
+# -> [linux], dropping the target from 54 to 53. RECOUNT, do not decrement.
 #
 # Sized so the widest play runs in ONE batch. At 40 forks a 54-host play
 # ran two rounds -- the second only 14 wide -- and those are the long plays.
@@ -48,7 +51,7 @@ MAX_ATTEMPTS=3
 #
 # RECOUNT, do not increment, when hosts are added or removed. Adding a host
 # to [windows] or [linux] moves the target this is derived from.
-FORKS=56
+FORKS=55
 
 # --- Speed knobs -------------------------------------------------------------
 # Trims 5-10 minutes off a full-fleet run vs Ansible defaults.

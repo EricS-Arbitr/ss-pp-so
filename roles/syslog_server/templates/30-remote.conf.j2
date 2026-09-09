@@ -14,8 +14,8 @@ input(type="imtcp" port="514")
 # Per-host file template:
 #   /var/log/remote/<hostname>/syslog.log
 # pfSense sends its hostname unqualified (pp-ot-firewall), VyOS sends short
-# hostnames too, Linux uses %HOSTNAME% from /etc/hostname. The Splunk UF on
-# this same host uses the directory name as the host= field.
+# hostnames too, Linux uses %HOSTNAME% from /etc/hostname. The directory
+# name is the host attribution for anything reading this store.
 template(
   name="RemoteHostFile"
   type="list"
