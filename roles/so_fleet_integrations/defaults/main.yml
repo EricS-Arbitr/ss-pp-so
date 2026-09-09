@@ -58,9 +58,13 @@ so_fleet_integrations:
     #   billing.access.log    billing.voltgrid.com -> gunicorn:5000
     #   wordpress.access.log  default_server       -> WordPress:8080
     input: nginx-logfile
+    # The package default only matches access.log* / error.log*. Ours are
+    # billing.access.log and wordpress.access.log, so the glob must be wider
+    # or nginx collects nothing while reporting healthy.
     access_paths: ["/var/log/nginx/*access.log*"]
     error_paths: ["/var/log/nginx/*error.log*"]
     verify_datastream: "logs-nginx.access-default"
+    verify_field: "url.path"
 
   - policy: so-proxy
     description: "Forward proxy — Squid access log"
@@ -68,6 +72,16 @@ so_fleet_integrations:
     name: squid-proxy
     template: squid.json.j2
     hosts: ["pp-proxy"]
-    input: squid-logfile
-    access_paths: ["/var/log/squid/access.log*"]
+    # NOT a file tailer. Confirmed against the package manifest 2026-09-09:
+    # squid.log carries input=udp, so the integration LISTENS and squid must
+    # SEND. Squid supports a udp:// log destination natively, so it emits
+    # straight to the agent on loopback -- nothing on the wire, and no
+    # syslog copy landing in system.syslog as unparsed text.
+    # The matching squid.conf change is a post-play in
+    # arbitr_pp_playbook.yaml (squid is a base role; workarounds are plays,
+    # not role forks -- CLAUDE.md).
+    input: squid-udp
+    udp_host: "127.0.0.1"
+    udp_port: 9537           # package default; no reason to move it
     verify_datastream: "logs-squid.log-default"
+    verify_field: "source.ip"

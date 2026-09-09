@@ -389,6 +389,74 @@
   tags:
     - squid
 
+# Squid log destination — point it at the Elastic agent, not at files.
+#
+# A play rather than a squid role fork, per the standing convention: base
+# role gaps get compensated after the role runs.
+#
+# Elastic's squid integration is a UDP RECEIVER (confirmed against the
+# package manifest 2026-09-09: squid.log carries input=udp, not logfile), so
+# squid has to send rather than the agent tailing a file. Squid supports a
+# udp:// destination natively, so this goes straight to the agent on
+# loopback.
+#
+# The two log lines this replaces:
+#   access_log /var/log/squid/access.log splunk_json_squid
+#       Splunk-specific JSON. Splunk was removed 2026-09-09; no consumer.
+#   access_log syslog:local2 combined
+#       Went to the host`s own /var/log/syslog, where the system integration
+#       picked it up and shipped it to SO as UNPARSED message text -- the
+#       >=10,000 raw Squid lines found sitting in logs-system.syslog on
+#       2026-09-09. Removing it deletes that duplicate at source; the parsed
+#       copy in logs-squid.log-* replaces it with real fields.
+#
+# Squid`s own system messages still reach pp-syslog via the host`s `*.*`
+# rsyslog forward. Only the ACCESS log stops going there.
+- name: Squid — send access log to the Elastic agent instead of files/syslog
+  hosts: proxy
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Remove the Splunk-format access_log line
+      ansible.builtin.lineinfile:
+        path: /etc/squid/squid.conf
+        regexp: '^access_log\s+/var/log/squid/access\.log\s+splunk_json_squid'
+        state: absent
+      register: squid_rm_splunk
+
+    - name: Remove the syslog access_log line (duplicate into system.syslog)
+      ansible.builtin.lineinfile:
+        path: /etc/squid/squid.conf
+        regexp: '^access_log\s+syslog:local2'
+        state: absent
+      register: squid_rm_syslog
+
+    - name: Send the access log to the Elastic agent over loopback UDP
+      ansible.builtin.lineinfile:
+        path: /etc/squid/squid.conf
+        regexp: '^access_log\s+udp://'
+        line: "access_log udp://127.0.0.1:9537 squid"
+        insertafter: '^#?\s*access_log'
+        state: present
+      register: squid_add_udp
+
+    # Reload, not restart: squid re-reads config without dropping in-flight
+    # client connections, and the range has live user emulation against it.
+    - name: Reload squid if the log destinations changed
+      ansible.builtin.command: squid -k reconfigure
+      when: squid_rm_splunk.changed or squid_rm_syslog.changed or squid_add_udp.changed
+      changed_when: true
+
+    # Positive proof the line is actually in force, not merely in the file.
+    - name: Confirm squid is running with the udp destination
+      ansible.builtin.command: grep -c "^access_log udp://127.0.0.1:9537 squid" /etc/squid/squid.conf
+      register: squid_udp_check
+      changed_when: false
+      failed_when: squid_udp_check.rc != 0
+  tags:
+    - squid
+    - squid_logging
+
 - name: wordpress-pv
   hosts: wordpress-pv
   gather_facts: false

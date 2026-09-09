@@ -11,8 +11,9 @@
         "squid.log": {
           "enabled": true,
           "vars": {
-            "paths": {{ item.access_paths | to_json }},
-            "tags": ["squid-log"],
+            "udp_host": "{{ item.udp_host }}",
+            "udp_port": {{ item.udp_port }},
+            "tags": ["squid-log", "forwarded"],
             "preserve_original_event": false
           }
         }

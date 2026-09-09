@@ -129,13 +129,21 @@
 # --- Proof, not an exit code ---------------------------------------------
 # An integration can create cleanly, attach cleanly, and collect NOTHING --
 # a wrong input or stream id in defaults/main.yml produces exactly that, and
-# every 200 along the way still says success. The only question that matters
-# is whether documents landed. Retries because the agent has to check in,
-# receive the new policy and start harvesting first.
-- name: Wait for documents to arrive in each dataset
+# every 200 along the way still says success.
+#
+# We assert a PARSED FIELD, not a document count. A count only proves bytes
+# arrived: if the log format does not match what the ingest pipeline expects,
+# documents still land, they just have no usable fields. That is the squid
+# trap in particular -- the integration wants squid`s native format, and
+# feeding it something else yields a full index of unqueryable rows. Asking
+# for url.path / source.ip proves the pipeline actually understood the data.
+#
+# Retries because the agent has to check in, receive the new policy and start
+# collecting before anything can land.
+- name: Wait for PARSED documents to arrive in each dataset
   ansible.builtin.shell: |
-    n=$(so-elasticsearch-query "{{ item.verify_datastream }}/_count" 2>/dev/null | grep -o "\"count\":[0-9]*" | cut -d: -f2)
-    if [ -n "$n" ] && [ "$n" -gt 0 ]; then echo "DATA_OK {{ item.verify_datastream }} $n"; else echo "DATA_NONE {{ item.verify_datastream }}"; fi
+    n=$(so-elasticsearch-query "{{ item.verify_datastream }}/_search?q={{ item.verify_field }}:*&size=0&filter_path=hits.total" 2>/dev/null | grep -o "\"value\":[0-9]*" | head -1 | cut -d: -f2)
+    if [ -n "$n" ] && [ "$n" -gt 0 ]; then echo "DATA_OK {{ item.verify_datastream }} {{ item.verify_field }}=$n"; else echo "DATA_NONE {{ item.verify_datastream }}"; fi
   args:
     executable: /bin/bash
   register: so_fleet_data
@@ -161,8 +169,11 @@
              . /usr/sbin/so-elastic-fleet-common
              fleet_api "epm/packages/<pkg>" | jq -r '.item.data_streams[]
                | "\(.dataset)  input=\(.streams[0].input)"'
-        2. the log paths exist on the target host and are readable by the
-           elastic-agent user.
+        2. the source is actually sending. nginx: the paths exist and are
+           readable by the elastic-agent user. squid: squid.conf carries
+           `access_log udp://127.0.0.1:9537 squid` and squid was reloaded.
+        2b. the FORMAT matches. Documents with no parsed fields mean the
+           ingest pipeline did not recognise the input -- check a raw doc.
         3. the host actually moved policy — so-elastic-fleet-agent-policy-view
            <policy> should list it.
   vars:
