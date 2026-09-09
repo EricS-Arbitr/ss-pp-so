@@ -1,0 +1,22 @@
+{
+  "policy_id": "{{ item.policy }}",
+  "package": { "name": "{{ item.package }}", "version": "" },
+  "name": "{{ item.name }}",
+  "namespace": "default",
+  "description": "Managed by so_fleet_integrations (Ansible). Do not edit in SOC.",
+  "inputs": {
+    "{{ item.input }}": {
+      "enabled": true,
+      "streams": {
+        "squid.log": {
+          "enabled": true,
+          "vars": {
+            "paths": {{ item.access_paths | to_json }},
+            "tags": ["squid-log"],
+            "preserve_original_event": false
+          }
+        }
+      }
+    }
+  }
+}

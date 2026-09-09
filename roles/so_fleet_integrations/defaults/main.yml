@@ -1,0 +1,73 @@
+---
+# =========================================================================
+# so_fleet_integrations — host-scoped Elastic integrations in SO's Fleet
+# =========================================================================
+# WHY DEDICATED AGENT POLICIES
+# ---------------------------
+# A Fleet integration attaches to an agent POLICY, not a host. Every agent on
+# that policy runs every input in it. All ~50 endpoints on this range enrol
+# into `endpoints-initial`, so adding nginx there would have 48 hosts tailing
+# /var/log/nginx/*.log that does not exist -- continuous harvester errors in
+# logs-elastic_agent.filebeat-*, and Linux paths pushed onto Windows hosts.
+#
+# Elastic Agent inputs do support a `condition` expression, which would let
+# these live in the shared policy and self-disable elsewhere. NOT used: no
+# integration SO ships uses it, so it is unproven on this grid and this is
+# not the place to be first (Eric, 2026-09-09).
+#
+# WHY WE CALL THE API OURSELVES
+# -----------------------------
+# so-elastic-fleet-integration-policy-load walks ONLY hardcoded directories
+# (endpoints-initial, grid-nodes_general, grid-nodes_heavy,
+# integrations-optional/FleetServer*). A directory we add is never read. So
+# we drive elastic_fleet_integration_create/_update from so-elastic-fleet-
+# common directly. Upside: SO's loader and ours never contend, and the
+# highstate cannot revert what we create.
+#
+# Our JSON lives OUTSIDE /opt/so/conf/elastic-fleet/ deliberately -- salt
+# recurses that tree and could purge files it does not know about.
+so_fleet_json_dir: /opt/so/conf/arbitr-fleet
+
+# How long to wait for the first documents. The agent must check in, receive
+# the new policy, start the input and harvest before anything lands -- 10 min
+# is generous for a check-in interval measured in seconds, and failing here
+# is the whole point of the step, so a short window would produce false
+# alarms rather than catching real ones.
+so_fleet_verify_retries: 20
+
+# Fleet policy defaults. inactivity_timeout matches SO's own endpoints-initial
+# (14 days) so a powered-off range host is not marked inactive mid-exercise.
+so_fleet_policy_timeout: 1209600
+
+# Package input/stream identifiers. IN VARS, NOT BAKED INTO THE TEMPLATES:
+# these come from each package's own manifest and differ per integration.
+# Confirm against the grid with:
+#   . /usr/sbin/so-elastic-fleet-common
+#   fleet_api "epm/packages/nginx" | jq -r '.item.data_streams[]
+#     | "\(.dataset)  input=\(.streams[0].input)"'
+# A wrong id yields an integration that creates cleanly and collects nothing,
+# which is exactly the failure mode the verify step below exists to catch.
+so_fleet_integrations:
+  - policy: so-webserver
+    description: "Web servers — nginx access and error logs"
+    package: nginx
+    name: nginx-webservers
+    template: nginx.json.j2
+    hosts: ["pp-www"]
+    # Both sites front through one nginx on pp-www:
+    #   billing.access.log    billing.voltgrid.com -> gunicorn:5000
+    #   wordpress.access.log  default_server       -> WordPress:8080
+    input: nginx-logfile
+    access_paths: ["/var/log/nginx/*access.log*"]
+    error_paths: ["/var/log/nginx/*error.log*"]
+    verify_datastream: "logs-nginx.access-default"
+
+  - policy: so-proxy
+    description: "Forward proxy — Squid access log"
+    package: squid
+    name: squid-proxy
+    template: squid.json.j2
+    hosts: ["pp-proxy"]
+    input: squid-logfile
+    access_paths: ["/var/log/squid/access.log*"]
+    verify_datastream: "logs-squid.log-default"
