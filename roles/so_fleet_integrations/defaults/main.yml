@@ -188,3 +188,57 @@ so_fleet_integrations:
     seed:
       host: pp-syslog
       requests: []
+
+  # --- VyOS: read the collector's own files ------------------------------
+  # Simpler than pfSense. filestream READS FILES, so pp-syslog's agent tails
+  # /var/log/remote/<router>/syslog.log directly -- no relay, no listening
+  # port, no rsyslog rule ordering to get wrong.
+  #
+  # WORTH INGESTING ONLY BECAUSE THE GETTY LOOP IS FIXED. Sampled before the
+  # fix, these logs were 97% noise (systemd + agetty churn from a serial
+  # console flapping every 10s, plus a range-agent heartbeat) and I judged
+  # them worthless. That was measuring a bug, not the source. With the loop
+  # gone the same file shows sshd logins, systemd-logind sessions, sudo with
+  # the exact command run, and vyos-configd commits -- precisely the trail an
+  # attacker pivoting through network gear leaves.
+  #
+  # data_stream.dataset is set DELIBERATELY. The package default is
+  # filestream.generic, which SO already uses for its own zeek, suricata and
+  # idh imports; landing VyOS there would mix router syslog into SO's import
+  # datasets. `vyos` gives logs-vyos-default, unambiguous and greppable.
+  #
+  # exclude_lines drops range-agent: a fixed 10s platform heartbeat, roughly
+  # 8,600 lines/day/router, that will never carry a security event. systemd
+  # is deliberately KEPT -- post-fix its volume is modest and its session
+  # scopes pair with the sshd logins.
+  #
+  # NO PARSING. There is no VyOS integration in Elastic's catalogue and the
+  # generic udp/tcp packages are absent from this airgapped registry, so the
+  # message body stays text. log.file.path carries the router name, so events
+  # remain filterable by device. A dissect processor could lift the hostname
+  # into host.name if that proves worth having.
+  - policy: so-syslog
+    description: "Syslog collector — VyOS router logs"
+    package: filestream
+    name: vyos-routers
+    template: vyos.json.j2
+    hosts: ["pp-syslog"]
+    mirror_base: true
+    input: filestream-filestream
+    dataset: vyos
+    # Explicit per-router paths, NEVER a glob over /var/log/remote/. That
+    # directory holds every sender -- the Linux hosts already reporting via
+    # their own agents, and the pfSense firewalls now arriving parsed -- so a
+    # glob would re-ingest both. pp-isp-router is excluded here for the same
+    # reason it is excluded from syslog collection: it represents the
+    # upstream ISP, not corporate gear.
+    paths: >-
+      {{ (groups['vyos'] | default([]) + groups['vyos_routes_only'] | default([]))
+         | difference(['pp-isp-router']) | unique | sort
+         | map('regex_replace', '^(.*)$', '/var/log/remote/\\1/syslog.log') | list }}
+    exclude_lines: ["range-agent"]
+    verify_datastream: "logs-vyos-default"
+    verify_field: "log.file.path"
+    seed:
+      host: pp-syslog
+      requests: []
