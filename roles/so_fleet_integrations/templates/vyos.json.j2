@@ -11,7 +11,7 @@
         "filestream.generic": {
           "enabled": true,
           "vars": {
-            "paths": {{ item.paths | to_json }},
+            "paths": [{% for h in item.path_hosts %}"/var/log/remote/{{ h }}/syslog.log"{% if not loop.last %}, {% endif %}{% endfor %}],
             "data_stream.dataset": "{{ item.dataset }}",
             "exclude_lines": {{ item.exclude_lines | to_json }},
             "tags": ["vyos", "forwarded"]

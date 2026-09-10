@@ -232,10 +232,16 @@ so_fleet_integrations:
     # glob would re-ingest both. pp-isp-router is excluded here for the same
     # reason it is excluded from syslog collection: it represents the
     # upstream ISP, not corporate gear.
-    paths: >-
+    # The ROUTER LIST only. The paths themselves are built by a loop in
+    # vyos.json.j2, deliberately: a map('regex_replace', ...) with a \1
+    # backreference here rendered the backreference LITERALLY on the host
+    # (2026-09-10 -- four identical paths reading /var/log/remote/\1/...).
+    # The host count was right, so the list logic was fine; only the escaping
+    # through YAML folded block -> Jinja literal -> Ansible regex_replace was
+    # wrong. A loop has nothing to escape.
+    path_hosts: >-
       {{ (groups['vyos'] | default([]) + groups['vyos_routes_only'] | default([]))
-         | difference(['pp-isp-router']) | unique | sort
-         | map('regex_replace', '^(.*)$', '/var/log/remote/\\1/syslog.log') | list }}
+         | difference(['pp-isp-router']) | unique | sort }}
     exclude_lines: ["range-agent"]
     verify_datastream: "logs-vyos-default"
     verify_field: "log.file.path"
