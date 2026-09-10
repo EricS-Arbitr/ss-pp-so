@@ -33,6 +33,11 @@ so_fleet_json_dir: /opt/so/conf/arbitr-fleet
 # is generous for a check-in interval measured in seconds, and failing here
 # is the whole point of the step, so a short window would produce false
 # alarms rather than catching real ones.
+# Common wget options for seeding. Short timeouts and few retries: a seed
+# that cannot complete quickly is not worth waiting on, and the verify step
+# is what actually decides success.
+so_fleet_seed_opts: "-q -T 10 -t 2"
+
 # 20 x 30s = 10 min. Long enough for an agent to check in, receive a new
 # policy and start collecting. NOT long enough to paper over a real fault:
 # on 2026-09-09 this failed honestly after 10 min because the host had been
@@ -69,6 +74,14 @@ so_fleet_integrations:
     error_paths: ["/var/log/nginx/*error.log*"]
     verify_datastream: "logs-nginx.access-default"
     verify_field: "url.path"
+    # Hit BOTH vhosts: the default server (WordPress) and billing, which is
+    # selected by Host header, so each writes to its own access log and both
+    # path globs get exercised rather than just one.
+    seed:
+      host: pp-www
+      requests:
+        - "-O /dev/null http://127.0.0.1/"
+        - "-O /dev/null --header=Host:billing.voltgrid.com http://127.0.0.1/"
 
   - policy: so-proxy
     description: "Forward proxy — Squid access log"
@@ -100,3 +113,10 @@ so_fleet_integrations:
     udp_port: 9537           # package default; no reason to move it
     verify_datastream: "logs-squid.log-default"
     verify_field: "source.ip"
+    # Through the proxy to an in-range site. Deliberately voltgrid rather
+    # than a simulated-internet host: it stays inside the range, and the same
+    # request also lands a line in nginx, so one seed exercises both paths.
+    seed:
+      host: pp-proxy
+      requests:
+        - "-O /dev/null -e use_proxy=yes -e http_proxy=127.0.0.1:3128 http://www.voltgrid.com/"

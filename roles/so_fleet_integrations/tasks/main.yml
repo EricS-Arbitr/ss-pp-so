@@ -147,6 +147,45 @@
   loop_control:
     label: "{{ item.1 }} -> {{ item.0.policy }}"
 
+# --- Seed traffic so verification does not depend on luck -----------------
+# On the 2026-09-10 fresh build these datasets verified on 2 and 4 documents
+# -- whatever incidental traffic happened to cross the range during the
+# 10-minute wait. User emulation is not running yet at this point in the
+# deploy, so a quieter build would have produced zero and hard-failed the
+# LAST phase of a five-hour run.
+#
+# Generating the traffic ourselves removes the dependence on ambient
+# activity, and unlike downgrading the check to a warning it still proves
+# the whole path works: request -> log line -> agent -> ingest pipeline ->
+# parsed document.
+#
+# Deliberately tolerant. A seed that fails is not itself a deploy failure;
+# the verify step below is the judge. wget over curl (Eric, 2026-09-10).
+- name: Seed traffic so the verify step does not depend on ambient activity
+  ansible.builtin.shell: |
+    if ! command -v wget > /dev/null 2>&1; then
+      echo "SEED_SKIPPED wget not present on {{ item.seed.host }}"
+      exit 0
+    fi
+    ok=0
+    {% for r in item.seed.requests %}
+    if wget {{ so_fleet_seed_opts }} {{ r }} > /dev/null 2>&1; then ok=$((ok+1)); fi
+    {% endfor %}
+    echo "SEEDED {{ item.seed.host }} $ok/{{ item.seed.requests | length }}"
+  args:
+    executable: /bin/bash
+  delegate_to: "{{ item.seed.host }}"
+  register: so_fleet_seed
+  changed_when: false
+  failed_when: false
+  loop: "{{ so_fleet_integrations }}"
+  loop_control:
+    label: "{{ item.seed.host }}"
+
+- name: Report what was seeded
+  ansible.builtin.debug:
+    msg: "{{ so_fleet_seed.results | map(attribute='stdout') | list }}"
+
 # --- Proof, not an exit code ---------------------------------------------
 # An integration can create cleanly, attach cleanly, and collect NOTHING --
 # a wrong input or stream id in defaults/main.yml produces exactly that, and
