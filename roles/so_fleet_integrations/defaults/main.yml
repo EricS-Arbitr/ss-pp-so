@@ -120,3 +120,40 @@ so_fleet_integrations:
       host: pp-proxy
       requests:
         - "-O /dev/null -e use_proxy=yes -e http_proxy=127.0.0.1:3128 http://www.voltgrid.com/"
+
+  # --- pfSense: a LISTENER on so-manager, not on an endpoint -------------
+  # The three firewalls cannot run an Elastic Agent, so the agent has to
+  # receive from them. It rides so-manager`s own Fleet Server policy
+  # (FleetServer_so-manager), which already exists -- no new policy, and no
+  # agent to reassign, hence hosts: [].
+  #
+  # SO ships an `optional_integrations` pillar that does the same job with
+  # enabled_nodes scoping. Not used: it needs BOTH a JSON template in the
+  # salt tree AND a pillar entry whose nesting is unconfirmed, and it still
+  # relies on SO`s loader to make the API call. This path is already proven
+  # (nginx + squid, 2026-09-09). SO`s loader only creates/updates what is in
+  # its own directories and the highstate does not reconcile Fleet API
+  # state, so the two do not contend. Revisit if that ever changes.
+  #
+  # Input key is pfsense-udp: this package`s policy template IS named after
+  # the package, unlike squid`s (which is `log`). Derived, not assumed.
+  - policy: FleetServer_so-manager
+    description: "Fleet Server — so-manager"
+    package: pfsense
+    name: pfsense-firewalls
+    template: pfsense.json.j2
+    hosts: []
+    input: pfsense-udp
+    syslog_host: "0.0.0.0"
+    syslog_port: "{{ so_pfsense_syslog_port }}"
+    # Which side of a flow counts as internal. All in-scenario space here is
+    # RFC1918, so the package default is correct -- but it decides traffic
+    # DIRECTION on every firewall event, so it is stated rather than implied.
+    internal_networks: ["private"]
+    verify_datastream: "logs-pfsense.log-default"
+    verify_field: "source.ip"
+    # No seed: the firewalls log continuously, and there is no equivalent of
+    # a wget that would deterministically produce a firewall event.
+    seed:
+      host: so-manager
+      requests: []

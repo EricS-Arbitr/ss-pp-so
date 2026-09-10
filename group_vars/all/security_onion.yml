@@ -311,3 +311,22 @@ so_registry_download_passes: 8
 # rather than so_apt_mirror/defaults because the wait play at the top of
 # playbooks/40-manager.yml reads it and does not include that role.
 so_registry_build_log: /var/log/so_registry_build.log
+
+# Where Fleet listens: the manager. In group_vars rather than
+# roles/elastic_agent/defaults because the pfSense syslog play references it
+# without including that role (role-scope trap, caught by verify_vars.py
+# 2026-09-10 -- the fourth instance).
+so_fleet_host: "{{ hostvars[groups['so_manager'][0]]['so_prod_ip'] }}"
+
+# Port the Elastic pfSense integration listens on, on so-manager. Package
+# default is 9001; the three firewalls are configured to send here as their
+# SECOND syslog destination (pp-syslog remains the first). See the pfSense
+# syslog client play in arbitr_pp_playbook.yaml.
+so_pfsense_syslog_port: 9001
+
+# NO VyOS PORT. Confirmed against the airgapped package registry 2026-09-10:
+# Elastic`s generic `udp` and `tcp` packages are NOT AVAILABLE on this grid,
+# and there is no VyOS vendor integration. VyOS therefore has no route to a
+# parsed dataset by direct send. It continues to reach pp-syslog`s
+# /var/log/remote/ store, which is unchanged. Pending a decision on whether
+# to read that store with a Custom Logs integration instead.
