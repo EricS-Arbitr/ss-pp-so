@@ -98,19 +98,33 @@
       echo "BASE_PRESENT $NEWNAME"
       exit 0
     fi
-    # Strip server-assigned fields; keep the inputs verbatim.
+    # BOTH policy_id AND policy_ids. Fleet honours the PLURAL; setting only
+    # the singular leaves the clone pointing at the SOURCE policy, which on
+    # 2026-09-10 created duplicate `system` integrations on endpoints-initial
+    # and had Fleet reject `endpoint`/`osquery_manager` with "already exists
+    # on this agent policy" -- an error that reads like a no-op and is
+    # actually the clone landing in the wrong place.
     BODY=$(fleet_api "package_policies/$SRC" \
            | jq --arg pid "$DST" --arg nm "$NEWNAME" '.item
-               | .policy_id=$pid | .name=$nm
+               | .policy_id=$pid | .policy_ids=[$pid] | .name=$nm
                | del(.id,.revision,.created_at,.created_by,.updated_at,.updated_by,.version,.agents,.spaceIds,.elasticsearch)')
     if [ -z "$BODY" ]; then
       echo "BASE_FAILED $NEWNAME could not read source policy"
       exit 0
     fi
-    if printf '%s' "$BODY" | fleet_api "package_policies" -XPOST -H "kbn-xsrf: true" -H "Content-Type: application/json" -d @- > /dev/null; then
+    if ! printf '%s' "$BODY" | fleet_api "package_policies" -XPOST -H "kbn-xsrf: true" -H "Content-Type: application/json" -d @- > /dev/null; then
+      echo "BASE_FAILED $NEWNAME"
+      exit 0
+    fi
+    # A 2xx is not proof it landed where we asked. The policy_ids bug above
+    # returned success while creating the integration on the WRONG policy,
+    # so confirm it is actually on DST before claiming it worked.
+    LANDED=$(/usr/sbin/so-elastic-fleet-agent-policy-view "$DST" \
+             | jq -r --arg n "$NEWNAME" '.item.package_policies[]? | select(.name==$n) | .id' | head -1)
+    if [ -n "$LANDED" ]; then
       echo "BASE_CLONED $NEWNAME"
     else
-      echo "BASE_FAILED $NEWNAME"
+      echo "BASE_FAILED $NEWNAME created but not on $DST"
     fi
   args:
     executable: /bin/bash
