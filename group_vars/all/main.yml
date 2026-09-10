@@ -149,3 +149,17 @@ so_capture_loss_min_acks: 200
 # loss remains unresolved -- see the task comment in playbooks/60-verify.yml.
 # Flip to true once it is fixed, turning this into a regression gate.
 so_capture_loss_fatal: false
+
+# --- Boot-time apt/dpkg lock ----------------------------------------------
+# Ubuntu runs unattended-upgrades on first boot and holds
+# /var/lib/dpkg/lock-frontend for MINUTES. Every apt task before that
+# finishes fails outright, and deploy.sh's three attempts fire seconds apart
+# so all three lose the same race -- a fresh ss-pp-so controller died in
+# 1m22s on 2026-09-10 with all three attempts hitting process 3006
+# (unattended-upgr).
+#
+# 60 x 10s = 10 minutes. Long enough to outlast a first-boot upgrade run,
+# short enough that a genuinely stuck lock still fails the deploy rather
+# than hanging it.
+so_apt_lock_tries: 60
+so_apt_lock_delay: 10

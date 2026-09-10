@@ -11,6 +11,51 @@ Severity key:
 
 
 
+## 2026-09-10 · platform · unattended-upgrades holds the dpkg lock on first boot and kills the entire deploy in 90 seconds
+
+**Symptom.** A fresh range died before the first play finished, all three
+deploy.sh attempts identical:
+
+```
+TASK [so_apt_mirror : Install nginx + git] ***
+fatal: [ansible]: FAILED! => E: Could not get lock /var/lib/dpkg/lock-frontend.
+   It is held by process 3006 (unattended-upgr)
+
+Attempt 1 failed after 0h 01m 03s
+Attempt 2 failed after 0h 00m 10s
+Attempt 3 failed after 0h 00m 09s
+ERROR: Playbook failed after 3 attempts
+```
+
+**Cause.** Ubuntu runs `unattended-upgrades` on first boot and holds
+`/var/lib/dpkg/lock-frontend` for minutes. Any apt call before it finishes
+fails outright.
+
+**Why the retry budget does not help.** deploy.sh fires its three attempts
+seconds apart -- 1m03s, then 10s, then 9s. All three lose the same race, and
+BOOT_DELAY (180s) elapses before attempt 1, not between attempts. The whole
+deploy is dead in 1m22s of ansible time against a lock that clears on its
+own a few minutes later.
+
+**Fix (overlay).** A wait loop before any apt work in `so_apt_mirror` (the
+controller) and `so_base` (every SO node): poll fuser on the four apt/dpkg
+lock files, 60 x 10s. Falls back to pgrep where fuser is absent, because a
+missing binary must not read as a free lock. Fails the task with the holding
+process listed if the lock is still held after ten minutes, so a genuinely
+stuck lock still fails rather than hangs.
+
+**Upstream candidates.**
+1. The base images should disable or mask `unattended-upgrades` --
+   automation-managed range hosts have no use for it, and on an airgapped
+   range it cannot reach anything useful anyway.
+2. Failing that, deploy.sh's BOOT_DELAY should cover it -- but a fixed sleep
+   is the wrong instrument for a variable-length lock. Waiting on the lock
+   itself is strictly better.
+
+**Status: PROPOSED** — written 2026-09-10, not yet exercised. Verify on the
+next fresh range: the task should report `APT_LOCK_FREE after N check(s)`
+with N > 0 rather than failing.
+
 ## 2026-09-10 · platform · SimSpace VyOS image ships a serial console for a device that is not a tty — systemd restart loop, ~200k junk log lines/day
 
 **Symptom.** VyOS syslog is almost entirely noise. Sampling
