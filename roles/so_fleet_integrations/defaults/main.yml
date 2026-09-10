@@ -144,31 +144,36 @@ so_fleet_integrations:
       requests:
         - "-O /dev/null -e use_proxy=yes -e http_proxy=127.0.0.1:3128 http://www.voltgrid.com/"
 
-  # --- pfSense: a LISTENER on so-manager, not on an endpoint -------------
-  # The three firewalls cannot run an Elastic Agent, so the agent has to
-  # receive from them. It rides so-manager`s own Fleet Server policy
-  # (FleetServer_so-manager), which already exists -- no new policy, and no
-  # agent to reassign, hence hosts: [].
+  # --- pfSense: a LISTENER, and it belongs on pp-syslog -------------------
+  # The three firewalls cannot run an Elastic Agent, so an agent has to
+  # receive from them.
   #
-  # SO ships an `optional_integrations` pillar that does the same job with
-  # enabled_nodes scoping. Not used: it needs BOTH a JSON template in the
-  # salt tree AND a pillar entry whose nesting is unconfirmed, and it still
-  # relies on SO`s loader to make the API call. This path is already proven
-  # (nginx + squid, 2026-09-09). SO`s loader only creates/updates what is in
-  # its own directories and the highstate does not reconcile Fleet API
-  # state, so the two do not contend. Revisit if that ever changes.
+  # FIRST ATTEMPT PUT THIS ON so-manager AND IT DOES NOT WORK. Fleet stored
+  # the integration correctly on FleetServer_so-manager -- enabled true,
+  # compiled_stream host 0.0.0.0:9001, agent on that policy at matching
+  # revision 9 -- and the agent never materialised the input. Nothing on
+  # :9001, nothing in `elastic-agent inspect`, no error logged, and a
+  # restart changed none of it. The Fleet Server agent will not host an
+  # extra listener input, whatever the policy says (2026-09-10).
+  #
+  # pp-syslog is the right home anyway, and was the original recommendation:
+  #   * it is the pattern already proven here twice (nginx, squid) --
+  #     dedicated policy plus post-enrolment reassignment
+  #   * it puts the syslog receiver ON the syslog server
+  #   * it SIDESTEPS SO's firewall. so-manager is default-deny with no rule
+  #     for udp/9001, so even a working listener there would have needed a
+  #     deliberate hole in the SIEM's perimeter. pp-syslog is an ordinary
+  #     Linux host that already accepts syslog.
   #
   # Input key is pfsense-udp: this package`s policy template IS named after
   # the package, unlike squid`s (which is `log`). Derived, not assumed.
-  - policy: FleetServer_so-manager
-    description: "Fleet Server — so-manager"
+  - policy: so-syslog
+    description: "Syslog collector — pfSense firewall logs"
     package: pfsense
     name: pfsense-firewalls
     template: pfsense.json.j2
-    hosts: []
-    # FleetServer_so-manager is SO's own policy and already carries what that
-    # node needs. Mirroring endpoint integrations onto it would be wrong.
-    mirror_base: false
+    hosts: ["pp-syslog"]
+    mirror_base: true
     input: pfsense-udp
     syslog_host: "0.0.0.0"
     syslog_port: "{{ so_pfsense_syslog_port }}"
@@ -181,5 +186,5 @@ so_fleet_integrations:
     # No seed: the firewalls log continuously, and there is no equivalent of
     # a wget that would deterministically produce a firewall event.
     seed:
-      host: so-manager
+      host: pp-syslog
       requests: []

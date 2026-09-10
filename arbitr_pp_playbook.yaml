@@ -926,15 +926,20 @@
         # SECOND destination, not a replacement. pfSense supports three
         # remote syslog servers; the firewalls now dual-send:
         #   :514  -> pp-syslog    the /var/log/remote/ store (unchanged)
-        #   :9001 -> so-manager   Elastic pfSense integration -> parsed
+        #   :9001 -> pp-syslog    Elastic pfSense integration -> parsed
         #                         logs-pfsense.log-* in Security Onion
         #
-        # Direct to so-manager rather than relayed through pp-syslog on
-        # purpose: rsyslog rewrites the syslog header, so a relayed copy
-        # arrives with pp-syslog as the apparent host and all three
-        # firewalls collapse into one identity. Elastic's pfSense
-        # integration reads that header for attribution.
-        PFS_SYSLOG_SRV2: "{{ so_fleet_host }}:{{ so_pfsense_syslog_port }}"
+        # SAME HOST, two ports. The listener is NOT on so-manager: the Fleet
+        # Server agent there refuses to materialise an extra listener input
+        # (proved 2026-09-10), and so-manager is default-deny so it would
+        # also have needed a hole in the SIEM's own firewall.
+        #
+        # A SECOND UDP stream to the same box, not a relay of the first.
+        # Relaying through rsyslog would rewrite the syslog header, so every
+        # firewall would arrive attributed to pp-syslog -- and that header is
+        # exactly what the pfSense integration reads for attribution. Sending
+        # twice keeps each firewall's own identity intact.
+        PFS_SYSLOG_SRV2: "{{ syslog_server_ip }}:{{ so_pfsense_syslog_port }}"
       register: pfsense_syslog_cfg
       changed_when: "'CHANGED' in pfsense_syslog_cfg.stdout"
   tags:
