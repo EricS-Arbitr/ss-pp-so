@@ -28,6 +28,27 @@
 # recurses that tree and could purge files it does not know about.
 so_fleet_json_dir: /opt/so/conf/arbitr-fleet
 
+# --- Base telemetry parity ------------------------------------------------
+# A dedicated agent policy contains ONLY what we put in it. Moving a host off
+# endpoints-initial therefore STRIPS its endpoint telemetry unless we put it
+# back: verified 2026-09-10, pp-www had elastic-defend producing 0 documents
+# after the move while endpoints-initial carried defend, osquery, system,
+# windows and windows-defender.
+#
+# That is a worse outcome than the harvester noise dedicated policies were
+# meant to avoid, so every policy we create is endpoints-initial PLUS its
+# host-specific integration, never instead of.
+so_fleet_base_policy: endpoints-initial
+
+# The Linux-applicable subset. windows and winlog inputs are deliberately
+# NOT mirrored: our targets (pp-www, pp-proxy, pp-syslog) are all Linux, and
+# cloning a winlog input onto them would recreate the useless-input problem
+# on a smaller scale. Revisit if a Windows host ever needs a dedicated policy.
+so_fleet_base_packages:
+  - system
+  - osquery_manager
+  - endpoint
+
 # How long to wait for the first documents. The agent must check in, receive
 # the new policy, start the input and harvest before anything lands -- 10 min
 # is generous for a check-in interval measured in seconds, and failing here
@@ -63,6 +84,7 @@ so_fleet_integrations:
     name: nginx-webservers
     template: nginx.json.j2
     hosts: ["pp-www"]
+    mirror_base: true
     # Both sites front through one nginx on pp-www:
     #   billing.access.log    billing.voltgrid.com -> gunicorn:5000
     #   wordpress.access.log  default_server       -> WordPress:8080
@@ -89,6 +111,7 @@ so_fleet_integrations:
     name: squid-proxy
     template: squid.json.j2
     hosts: ["pp-proxy"]
+    mirror_base: true
     # NOT a file tailer. Confirmed against the package manifest 2026-09-09:
     # squid.log carries input=udp, so the integration LISTENS and squid must
     # SEND. Squid supports a udp:// log destination natively, so it emits
@@ -143,6 +166,9 @@ so_fleet_integrations:
     name: pfsense-firewalls
     template: pfsense.json.j2
     hosts: []
+    # FleetServer_so-manager is SO's own policy and already carries what that
+    # node needs. Mirroring endpoint integrations onto it would be wrong.
+    mirror_base: false
     input: pfsense-udp
     syslog_host: "0.0.0.0"
     syslog_port: "{{ so_pfsense_syslog_port }}"

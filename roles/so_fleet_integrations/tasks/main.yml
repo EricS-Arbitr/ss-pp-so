@@ -67,6 +67,93 @@
   loop_control:
     label: "{{ item.policy }}"
 
+# --- Base telemetry parity ------------------------------------------------
+# MUST run before the host-specific integration and before reassignment: the
+# moment a host moves onto a dedicated policy it runs ONLY what that policy
+# carries, so the base integrations have to be there first or the host has a
+# window with no endpoint telemetry at all.
+#
+# Clones each base package policy from endpoints-initial rather than
+# re-authoring it. Re-authoring would mean maintaining a second copy of SO`s
+# own Defend/osquery/system configuration and drifting from it silently on
+# every SO upgrade; a clone tracks whatever SO ships.
+#
+# Verified necessary 2026-09-10: after moving to so-webserver, pp-www had
+# elastic-defend producing 0 documents.
+- name: Mirror the base endpoint integrations onto each dedicated policy
+  ansible.builtin.shell: |
+    . /usr/sbin/so-elastic-fleet-common
+    DST="{{ item.0.policy }}"
+    PKG="{{ item.1 }}"
+    NEWNAME="$PKG-$DST"
+    SRC=$(/usr/sbin/so-elastic-fleet-agent-policy-view "{{ so_fleet_base_policy }}" \
+          | jq -r --arg p "$PKG" '.item.package_policies[]? | select(.package.name==$p) | .id' | head -1)
+    if [ -z "$SRC" ]; then
+      echo "BASE_MISSING $PKG not on {{ so_fleet_base_policy }}"
+      exit 0
+    fi
+    EXIST=$(/usr/sbin/so-elastic-fleet-agent-policy-view "$DST" \
+            | jq -r --arg n "$NEWNAME" '.item.package_policies[]? | select(.name==$n) | .id' | head -1)
+    if [ -n "$EXIST" ]; then
+      echo "BASE_PRESENT $NEWNAME"
+      exit 0
+    fi
+    # Strip server-assigned fields; keep the inputs verbatim.
+    BODY=$(fleet_api "package_policies/$SRC" \
+           | jq --arg pid "$DST" --arg nm "$NEWNAME" '.item
+               | .policy_id=$pid | .name=$nm
+               | del(.id,.revision,.created_at,.created_by,.updated_at,.updated_by,.version,.agents,.spaceIds,.elasticsearch)')
+    if [ -z "$BODY" ]; then
+      echo "BASE_FAILED $NEWNAME could not read source policy"
+      exit 0
+    fi
+    if printf '%s' "$BODY" | fleet_api "package_policies" -XPOST -H "kbn-xsrf: true" -H "Content-Type: application/json" -d @- > /dev/null; then
+      echo "BASE_CLONED $NEWNAME"
+    else
+      echo "BASE_FAILED $NEWNAME"
+    fi
+  args:
+    executable: /bin/bash
+  register: so_fleet_base
+  changed_when: "'BASE_CLONED' in so_fleet_base.stdout"
+  failed_when: "'BASE_FAILED' in so_fleet_base.stdout"
+  loop: >-
+    {{ so_fleet_integrations | selectattr('mirror_base') | list
+       | product(so_fleet_base_packages) | list }}
+  loop_control:
+    label: "{{ item.1 }} -> {{ item.0.policy }}"
+
+# Assert parity, do not assume the clones landed. This is the exact failure
+# that shipped on 2026-09-09 and was only caught by inspecting the policies
+# by hand two days later -- nothing in the run reported it, because every
+# API call had succeeded. A policy short of a base package means the host on
+# it is missing endpoint telemetry.
+- name: Verify each dedicated policy carries the full base telemetry set
+  ansible.builtin.shell: |
+    . /usr/sbin/so-elastic-fleet-common
+    HAVE=$(/usr/sbin/so-elastic-fleet-agent-policy-view "{{ item.policy }}" \
+           | jq -r '.item.package_policies[]? | .package.name' | sort -u | tr '\n' ' ')
+    MISSING=""
+    for p in {{ so_fleet_base_packages | join(' ') }}; do
+      case " $HAVE " in
+        *" $p "*) ;;
+        *) MISSING="$MISSING $p" ;;
+      esac
+    done
+    if [ -n "$MISSING" ]; then
+      echo "PARITY_MISSING {{ item.policy }} lacks:$MISSING (has: $HAVE)"
+    else
+      echo "PARITY_OK {{ item.policy }} ($HAVE)"
+    fi
+  args:
+    executable: /bin/bash
+  register: so_fleet_parity
+  changed_when: false
+  failed_when: "'PARITY_MISSING' in so_fleet_parity.stdout"
+  loop: "{{ so_fleet_integrations | selectattr('mirror_base') | list }}"
+  loop_control:
+    label: "{{ item.policy }}"
+
 # --- Integrations ---------------------------------------------------------
 # check then create-or-update, mirroring what SO's own loader does for its
 # hardcoded directories. Idempotent: a re-run updates in place.
