@@ -11,6 +11,60 @@ Severity key:
 
 
 
+## 2026-09-10 · platform · SimSpace VyOS image ships a serial console for a device that is not a tty — systemd restart loop, ~200k junk log lines/day
+
+**Symptom.** VyOS syslog is almost entirely noise. Sampling
+`/var/log/remote/pp-ot-router/syslog.log` on the central collector, 15 lines
+covering 26 seconds contained zero security-relevant events:
+
+```
+systemd[1]: Started serial-getty@ttyS0.service - Serial Getty on ttyS0.
+agetty[25972]: /dev/ttyS0: not a tty
+systemd[1]: serial-getty@ttyS0.service: Deactivated successfully.
+systemd[1]: serial-getty@ttyS0.service: Scheduled restart job, restart counter is at 5645
+range-agent[3523]: Service is running...
+```
+
+**Cause.** Every VyOS node in this image carries:
+
+```
+set system console device ttyS0 speed '115200'
+```
+
+`/dev/ttyS0` is not a working tty on these VMs. systemd starts
+`serial-getty@ttyS0`, agetty exits immediately, systemd restarts it. Forever.
+Confirmed identical on all four routers (`pp-corp-router`,
+`pp-internal-router`, `pp-ot-router`, `site-edge-router`), so it is an image
+default rather than range configuration.
+
+**Scale.** Restart counter 5645 at ~16 hours uptime = one cycle per ~10s.
+Five log lines per cycle, four routers: roughly **200,000 junk messages per
+day** into the syslog store. That is also why VyOS syslog looked worthless
+when evaluated as a SIEM source -- config commits, SSH logins and interface
+events are all in there, buried under a flapping getty.
+
+**Fix (overlay).** Delete it in VyOS CONFIG, not systemd:
+
+```
+delete system console device ttyS0
+```
+
+Masking the unit would be undone, since VyOS regenerates unit state from its
+own configuration on commit and boot. Nothing functional is lost -- the
+console has never worked on this image. The play checks before deleting,
+because VyOS errors on deleting an absent node and an unguarded `delete`
+would make every re-run fail rather than no-op.
+
+**Upstream candidates.**
+1. The image should not configure a serial console for a device the VM does
+   not provide. Every range built on it inherits an infinite restart loop.
+2. Failing that, `serial-getty@` should carry a `StartLimitBurst` so a
+   permanently-failing getty stops rather than retrying 5,645 times.
+
+**Status: PROPOSED** — written 2026-09-10, not yet exercised on a deploy.
+Verify by re-sampling a router's syslog an hour after the play runs: the
+getty and agetty lines should be absent entirely.
+
 ## 2026-09-07 · bug · so-setup deletes the docker proxy drop-in mid-run, then seeds its registry from ghcr.io over whatever DNS is left
 
 **Symptom.** ss-pp-stacked failed three deploy attempts (7h22m). so-manager

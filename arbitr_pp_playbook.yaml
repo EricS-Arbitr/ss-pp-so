@@ -299,6 +299,62 @@
 # sessions/interfaces stay up until reboot. Reboot is required for a
 # fully-clean IPv4-only state. `wait_for` polls the mgmt SSH port from
 # the controller so the deploy resumes cleanly after the box comes back.
+# =============================================================================
+# VyOS — remove the phantom serial console
+# =============================================================================
+# Every VyOS node in this image ships:
+#
+#   set system console device ttyS0 speed '115200'
+#
+# but /dev/ttyS0 is not a working tty on these VMs. systemd starts
+# serial-getty@ttyS0, agetty exits with "/dev/ttyS0: not a tty", systemd
+# restarts it, forever. Measured on pp-ot-router 2026-09-10:
+#
+#   serial-getty@ttyS0.service: Scheduled restart job, restart counter is at 5645
+#
+# One cycle per ~10s, about 16 hours of uptime. Five log lines per cycle
+# across four routers is roughly 200,000 junk messages a day landing in
+# pp-syslog's store -- which is why VyOS syslog looked worthless when we
+# sampled it for SIEM ingestion: the signal is real, it is just buried.
+#
+# Deleted in CONFIG, not masked in systemd. VyOS regenerates unit state from
+# its own configuration, so a `systemctl mask` would be undone by the next
+# commit or boot. Nothing is lost: this console has never worked on this
+# image, so there is no functioning access path to remove.
+#
+# Checked before deleting because VyOS errors on deleting an absent node,
+# which would make a re-run fail rather than no-op.
+- name: VyOS — remove the phantom serial console (systemd restart loop)
+  hosts: vyos:vyos_routes_only:!pp-isp-router
+  gather_facts: false
+  tasks:
+    - name: Check whether the ttyS0 console is configured
+      vyos.vyos.vyos_command:
+        commands:
+          - "show configuration commands | match \"console device ttyS0\""
+      register: vyos_console_cfg
+      changed_when: false
+      failed_when: false
+
+    - name: Delete the ttyS0 console device
+      vyos.vyos.vyos_config:
+        lines:
+          - "delete system console device ttyS0"
+        save: true
+      when: "'ttyS0' in (vyos_console_cfg.stdout | default([''], true) | join(' '))"
+      register: vyos_console_del
+
+    - name: Stop the flapping getty now, so the fix takes effect without a reboot
+      vyos.vyos.vyos_command:
+        commands:
+          - "run sudo systemctl stop serial-getty@ttyS0.service"
+      when: vyos_console_del.changed | default(false)
+      changed_when: true
+      failed_when: false
+  tags:
+    - vyos
+    - vyos_console
+
 - name: Disable IPv6 — VyOS
   hosts: vyos:vyos_routes_only
   gather_facts: false
