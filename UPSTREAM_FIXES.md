@@ -37,8 +37,16 @@ BOOT_DELAY (180s) elapses before attempt 1, not between attempts. The whole
 deploy is dead in 1m22s of ansible time against a lock that clears on its
 own a few minutes later.
 
-**Fix (overlay).** A wait loop before any apt work in `so_apt_mirror` (the
-controller) and `so_base` (every SO node): poll fuser on the four apt/dpkg
+**Fix (overlay), two parts.** On the controller, unattended-upgrades is now
+masked outright -- timers stopped/disabled/masked, service disabled and
+masked, and `20auto-upgrades` set to 0/0 so apt's own periodic config cannot
+re-arm it. The RUNNING job is deliberately left alone: killing it
+mid-transaction risks a half-configured dpkg, which is worse than the lock
+contention. Masking stops recurrence; the wait below covers the in-flight
+run.
+
+Second part, and it stays regardless: a wait loop before any apt work in
+`so_apt_mirror` (the controller) and `so_base` (every SO node): poll fuser on the four apt/dpkg
 lock files, 60 x 10s. Falls back to pgrep where fuser is absent, because a
 missing binary must not read as a free lock. Fails the task with the holding
 process listed if the lock is still held after ten minutes, so a genuinely

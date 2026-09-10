@@ -163,3 +163,10 @@ so_capture_loss_fatal: false
 # than hanging it.
 so_apt_lock_tries: 60
 so_apt_lock_delay: 10
+
+# Mask unattended-upgrades on the ansible controller. Automation-managed
+# range hosts have no use for it, and on an airgapped range it cannot reach
+# anything useful anyway -- all it does is hold the dpkg lock at first boot
+# and lose the deploy. Set false to leave the host's own upgrade schedule
+# alone (the lock wait above still handles the race, just more slowly).
+so_disable_unattended_upgrades: true
