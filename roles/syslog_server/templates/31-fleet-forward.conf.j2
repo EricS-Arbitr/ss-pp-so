@@ -24,9 +24,26 @@
 #
 # NO `stop`: messages continue to the per-host file rules in 30-remote.conf.
 # The store keeps everything it has today.
-{% set fw = groups['pfsense'] | default([]) %}
-{% if fw | length > 0 %}
-if ({% for h in fw %}$hostname == '{{ h }}'{% if not loop.last %} or {% endif %}{% endfor %}) then {
+# MATCH ON SOURCE IP, NOT HOSTNAME
+# ---------------------------------
+# pfSense does not send a resolvable hostname, so rsyslog falls back to the
+# source address: /var/log/remote/ on this host contains 172.16.0.9,
+# 172.16.0.18, 172.16.0.25 and 172.16.0.50 where the routers appear by name.
+# A `$hostname == pp-ot-firewall` rule therefore matched nothing at all
+# (2026-09-10) and the dataset was never created.
+#
+# Note pp-internal-firewall sends from TWO addresses (.18 WAN_EDGE and .25
+# INTERNAL), so matching one identity per firewall was never going to work
+# either. Every pfsense_interfaces entry is enumerated from inventory, so
+# adding an interface or a firewall keeps this in step automatically.
+{% set ns = namespace(ips=[]) %}
+{% for h in groups['pfsense'] | default([]) %}
+{%   for i in hostvars[h].pfsense_interfaces | default([]) %}
+{%     if i.ipv4_address is defined %}{% set ns.ips = ns.ips + [i.ipv4_address] %}{% endif %}
+{%   endfor %}
+{% endfor %}
+{% if ns.ips | length > 0 %}
+if ({% for ip in ns.ips %}$fromhost-ip == '{{ ip }}'{% if not loop.last %} or {% endif %}{% endfor %}) then {
     action(type="omfwd"
            target="127.0.0.1"
            port="{{ so_pfsense_syslog_port }}"
@@ -34,5 +51,5 @@ if ({% for h in fw %}$hostname == '{{ h }}'{% if not loop.last %} or {% endif %}
            template="RSYSLOG_ForwardFormat")
 }
 {% else %}
-# No hosts in [pfsense]; nothing to relay.
+# No pfsense_interfaces found in inventory; nothing to relay.
 {% endif %}
