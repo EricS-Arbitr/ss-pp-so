@@ -1,0 +1,38 @@
+# =========================================================================
+# 31-fleet-forward.conf — relay firewall syslog to the local Elastic agent
+# Managed by roles/syslog_server. Do not edit on the host.
+# =========================================================================
+# WHY A LOCAL RELAY AND NOT A SECOND DESTINATION ON THE FIREWALL
+# --------------------------------------------------------------
+# The firewalls were briefly configured to dual-send: :514 here for the
+# /var/log/remote/ store, and :{{ so_pfsense_syslog_port }} here for the
+# Elastic pfSense integration. pfSense honoured only ONE of them once both
+# entries pointed at the same address -- proved 2026-09-10 by tcpdump on
+# this host: steady traffic to :514, zero packets to :{{ so_pfsense_syslog_port }}.
+# The same dual-send DID work while the second target was a different host,
+# so pfSense appears to collapse remote syslog entries by address.
+#
+# So the firewalls send ONCE, and rsyslog fans out locally. Fewer moving
+# parts than the dual-send, and independent of pfSense's behaviour.
+#
+# ATTRIBUTION SURVIVES. The objection to relaying is that rsyslog rewrites
+# the syslog header, so every sender arrives as this host -- and that header
+# is exactly what the pfSense ingest pipeline reads. RSYSLOG_ForwardFormat
+# preserves the ORIGINAL hostname and timestamp, so each firewall keeps its
+# identity. That objection applies to relaying somewhere else, not to
+# fanning out on the box that already received the message.
+#
+# NO `stop`: messages continue to the per-host file rules in 30-remote.conf.
+# The store keeps everything it has today.
+{% set fw = groups['pfsense'] | default([]) %}
+{% if fw | length > 0 %}
+if ({% for h in fw %}$hostname == '{{ h }}'{% if not loop.last %} or {% endif %}{% endfor %}) then {
+    action(type="omfwd"
+           target="127.0.0.1"
+           port="{{ so_pfsense_syslog_port }}"
+           protocol="udp"
+           template="RSYSLOG_ForwardFormat")
+}
+{% else %}
+# No hosts in [pfsense]; nothing to relay.
+{% endif %}
