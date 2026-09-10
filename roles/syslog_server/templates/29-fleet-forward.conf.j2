@@ -1,7 +1,13 @@
 # =========================================================================
-# 31-fleet-forward.conf — relay firewall syslog to the local Elastic agent
+# 29-fleet-forward.conf — relay firewall syslog to the local Elastic agent
 # Managed by roles/syslog_server. Do not edit on the host.
 # =========================================================================
+# THE NUMBER IS LOad-BEARING. rsyslog reads /etc/rsyslog.d in lexical order,
+# and 30-remote.conf ends its remote-message block with `stop` so remote logs
+# do not also land in /var/log/syslog. Anything numbered above 30 therefore
+# NEVER SEES a remote message. This file was 31- until 2026-09-10 and did
+# nothing at all: config valid, addresses rendered correctly, rsyslog
+# restarted, zero packets relayed. Do not renumber it above 30.
 # WHY A LOCAL RELAY AND NOT A SECOND DESTINATION ON THE FIREWALL
 # --------------------------------------------------------------
 # The firewalls were briefly configured to dual-send: :514 here for the
