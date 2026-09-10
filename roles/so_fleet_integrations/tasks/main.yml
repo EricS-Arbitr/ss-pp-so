@@ -176,16 +176,24 @@
     . /usr/sbin/so-elastic-fleet-common
     JSON="{{ so_fleet_json_dir }}/{{ item.policy }}/{{ item.name }}.json"
     elastic_fleet_integration_check "{{ item.policy }}" "$JSON"
+    # Deliberately NOT using fleet_api here. It passes --fail and discards
+    # stderr, so a 4xx returns an empty body and the reason is lost -- every
+    # INTEGRATION_FAILED on this track has been opaque for that reason, and
+    # each one cost a round-trip to rediscover by hand. Same auth, same
+    # endpoint, response kept.
+    API="localhost:5601/api/fleet/package_policies"
+    CFG=/opt/so/conf/elasticsearch/curl.config
     if [ -n "$INTEGRATION_ID" ]; then
-      if elastic_fleet_integration_update "$INTEGRATION_ID" "@$JSON" > /dev/null; then
-        echo "INTEGRATION_UPDATED {{ item.name }}"
-      else
-        echo "INTEGRATION_FAILED {{ item.name }}"
-      fi
-    elif elastic_fleet_integration_create "@$JSON" > /dev/null; then
-      echo "INTEGRATION_CREATED {{ item.name }}"
+      RESP=$(curl -sK "$CFG" -L "$API/$INTEGRATION_ID" -H "kbn-xsrf: true" -H "Content-Type: application/json" -XPUT -d "@$JSON")
+      ACTION=UPDATED
     else
-      echo "INTEGRATION_FAILED {{ item.name }}"
+      RESP=$(curl -sK "$CFG" -L "$API" -H "kbn-xsrf: true" -H "Content-Type: application/json" -XPOST -d "@$JSON")
+      ACTION=CREATED
+    fi
+    if printf '%s' "$RESP" | grep -q '"item"'; then
+      echo "INTEGRATION_$ACTION {{ item.name }}"
+    else
+      echo "INTEGRATION_FAILED {{ item.name }} :: $(printf '%s' "$RESP" | head -c 400)"
     fi
   args:
     executable: /bin/bash
