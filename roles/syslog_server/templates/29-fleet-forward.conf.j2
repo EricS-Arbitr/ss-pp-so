@@ -21,12 +21,19 @@
 # So the firewalls send ONCE, and rsyslog fans out locally. Fewer moving
 # parts than the dual-send, and independent of pfSense's behaviour.
 #
-# ATTRIBUTION SURVIVES. The objection to relaying is that rsyslog rewrites
-# the syslog header, so every sender arrives as this host -- and that header
-# is exactly what the pfSense ingest pipeline reads. RSYSLOG_ForwardFormat
-# preserves the ORIGINAL hostname and timestamp, so each firewall keeps its
-# identity. That objection applies to relaying somewhere else, not to
-# fanning out on the box that already received the message.
+# RELAY THE RAW MESSAGE, BYTE FOR BYTE
+# ------------------------------------
+# RSYSLOG_ForwardFormat was tried first and DELIVERED but did not PARSE:
+# 260 documents reached logs-pfsense.log-default on 2026-09-10, every one
+# carrying an ingest error ("Provided Grok expressions do not match...").
+# That format re-renders the header -- its own RFC3164 timestamp, its own
+# %syslogtag% handling -- so what arrives is valid syslog but not what
+# pfSense actually sent, and the pfSense pipeline greps for pfSense's exact
+# structure.
+#
+# %rawmsg% forwards the original datagram unchanged, PRI and all. Attribution
+# comes free with it: the hostname in the message is pfSense's own, because
+# nothing has rewritten it.
 #
 # NO `stop`: messages continue to the per-host file rules in 30-remote.conf.
 # The store keeps everything it has today.
@@ -42,6 +49,10 @@
 # INTERNAL), so matching one identity per firewall was never going to work
 # either. Every pfsense_interfaces entry is enumerated from inventory, so
 # adding an interface or a firewall keeps this in step automatically.
+# The original datagram, untouched. Defined here rather than reusing a
+# built-in so it is obvious that nothing is being re-rendered.
+template(name="ArbitrRawForward" type="string" string="%rawmsg%")
+
 {% set ns = namespace(ips=[]) %}
 {% for h in groups['pfsense'] | default([]) %}
 {%   for i in hostvars[h].pfsense_interfaces | default([]) %}
@@ -54,7 +65,7 @@ if ({% for ip in ns.ips %}$fromhost-ip == '{{ ip }}'{% if not loop.last %} or {%
            target="127.0.0.1"
            port="{{ so_pfsense_syslog_port }}"
            protocol="udp"
-           template="RSYSLOG_ForwardFormat")
+           template="ArbitrRawForward")
 }
 {% else %}
 # No pfsense_interfaces found in inventory; nothing to relay.
