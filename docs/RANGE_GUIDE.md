@@ -7,9 +7,7 @@ Audience: range operators and instructors. Assumes working knowledge of
 Security Onion, Active Directory and Ansible.
 
 Scope: this document covers the range as built by `ss-pp-so`. Security Onion
-is the only SIEM here. Splunk was removed on 2026-09-09 — from the automation
-and from the blueprint — and every log source that previously reached it now
-reaches Security Onion instead.
+is the only SIEM; every log source on the range reports to it.
 
 ---
 
@@ -282,10 +280,10 @@ VyOS is the one source with no vendor integration, so its message bodies stay
 as text. `log.file.path` carries the router name, which keeps events
 filterable by device.
 
-**`/var/log/remote/` feeds no SIEM, deliberately.** Every Linux host already
-ships its own syslog via its agent, so relaying the store as well would put
-each message in Security Onion twice by two routes. The store is kept because
-it is a realistic enterprise construct and a plausible attacker target.
+**The `/var/log/remote/` store is a local archive, not a SIEM feed.** Every
+Linux host ships its own syslog through its agent, so relaying the store as
+well would place each message in Security Onion twice by two routes. It exists
+as a realistic enterprise construct and a plausible attacker target.
 
 ### Access
 
