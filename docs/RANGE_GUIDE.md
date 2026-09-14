@@ -6,9 +6,10 @@ telemetry coverage, deployment procedure and verification.
 Audience: range operators and instructors. Assumes working knowledge of
 Security Onion, Active Directory and Ansible.
 
-Scope: this document covers the range as built by `ss-pp-so`. Splunk is
-deployed here but out of scope pending the Splunk/Security Onion integration
-work.
+Scope: this document covers the range as built by `ss-pp-so`. Security Onion
+is the only SIEM here. Splunk was removed on 2026-09-09 — from the automation
+and from the blueprint — and every log source that previously reached it now
+reaches Security Onion instead.
 
 ---
 
@@ -16,13 +17,14 @@ work.
 
 | | |
 |---|---|
-| **Hosts** | 75 |
+| **Hosts** | 74 |
 | **AD forest** | `voltgrid.com`, three domain controllers, 40 domain members |
 | **Corporate segments** | Services, Business Processing, Engineering, Legal, InfoSec |
 | **OT enclave** | Four segments behind a dedicated firewall — control, turbine, turbine-sim, OT services |
 | **SIEM** | Security Onion 2.4 distributed — manager, search node, three sensors |
 | **Network visibility** | Three GRE `gretap` mirrors covering corporate, OT and the attack path |
 | **Endpoint visibility** | Elastic Agent on Windows and Linux hosts, enrolled into SO's Fleet |
+| **Application log sources** | nginx, Squid, pfSense and VyOS, parsed into their own datasets |
 | **Analyst positions** | Six dedicated hunt workstations on the security segment |
 | **Attack sources** | Red-1 (Kali) for manual operations, SimSpace attack emulation for automated |
 | **User activity** | 32 emulated users generating background traffic across the corporate segments |
@@ -172,8 +174,8 @@ under a corporate config-management regime.
 `pp-dcs-ctrl`, the DCS control station, forwards Windows event logs but runs
 **no Sysmon**, deliberately. The line is *instrument versus observe*: Sysmon
 instruments the OS with a kernel driver and process-level hooks, which does not
-belong on process-critical equipment, while a log forwarder only reads what
-Windows already writes. That is how conservative OT programmes actually behave.
+belong on process-critical equipment, while an agent collecting event logs
+only reads what Windows already writes. That is how conservative OT programmes actually behave.
 
 Practical consequence: on `pp-dcs-ctrl` you have Windows event data — logons,
 account use, service installs — and network evidence from `so-sensor-ot`, but
@@ -254,6 +256,37 @@ Coverage is a group rather than a host pattern so that "does this host produce
 endpoint telemetry" is a decision someone recorded, not a side effect of who
 happens to run emulated users.
 
+### Application log sources
+
+Four sources that are not endpoint telemetry reach Security Onion as parsed
+datasets, each on a dedicated Fleet agent policy:
+
+| Source | Host | Dataset | How it gets there |
+|---|---|---|---|
+| nginx | `pp-www` | `logs-nginx.access-*` / `error-*` | agent tails both vhost logs |
+| Squid | `pp-proxy` | `logs-squid.log-*` | Squid emits UDP to the local agent |
+| pfSense ×3 | via `pp-syslog` | `logs-pfsense.log-*` | rsyslog fans the raw datagram out to a local listener |
+| VyOS ×4 | via `pp-syslog` | `logs-vyos-*` | agent reads the collector's per-host files |
+
+`pp-www` fronts **both** sites through one nginx — `billing.voltgrid.com` to a
+gunicorn app, everything else to the WordPress container — so one access log
+covers both.
+
+The firewalls and routers cannot run an agent, so `pp-syslog` does the work for
+them. They send once, to `:514`, and rsyslog both stores the message under
+`/var/log/remote/<sender>/` and forwards a copy to the agent. The firewalls'
+copy is relayed **byte for byte**; re-rendering the syslog header breaks the
+pfSense ingest pipeline's parsing.
+
+VyOS is the one source with no vendor integration, so its message bodies stay
+as text. `log.file.path` carries the router name, which keeps events
+filterable by device.
+
+**`/var/log/remote/` feeds no SIEM, deliberately.** Every Linux host already
+ships its own syslog via its agent, so relaying the store as well would put
+each message in Security Onion twice by two routes. The store is kept because
+it is a realistic enterprise construct and a plausible attacker target.
+
 ### Access
 
 SOC web interface: **`https://172.16.9.30`**
@@ -273,7 +306,7 @@ They are **not** in the `[aue]` group and run no emulated users, so analyst
 activity is not mixed with synthetic user activity on the hosts analysts work
 from.
 
-They do carry Sysmon and a log forwarder. An attacker who reaches an analyst
+They do carry Sysmon and an Elastic Agent. An attacker who reaches an analyst
 workstation sees everything the SOC sees and can steer the investigation, so
 those hosts are monitored like any other endpoint.
 
@@ -306,7 +339,7 @@ the three prerequisites.
 ### Adjacency — read before running live samples
 
 `pp-remnux` and `pp-flare` share layer 2 with `so-manager`, `so-search`, all
-three sensors, `pp-splunk` and the six hunt workstations. A sample with
+three sensors and the six hunt workstations. A sample with
 worm-like behaviour reaches every one of them **without traversing a router**,
 so no firewall rule or routing change constrains it.
 
@@ -507,7 +540,6 @@ until timeout and looks like an unbooted host.
 | `pp-proxy` | 172.16.2.20 | Services | proxy |
 | `pp-remnux` | 172.16.9.100 | Security | forensics |
 | `pp-sift` | 172.16.9.101 | Security | forensics |
-| `pp-splunk` | 172.16.9.20 | Security | workstation / member |
 | `pp-sql` | 172.16.2.4 | Services | workstation / member |
 | `pp-syslog` | 172.16.2.9 | Services | syslog |
 | `pp-www` | 172.16.8.5 | DMZ | wordpress-pv |

@@ -8,7 +8,7 @@ Most SIEM training environments treat the network as a backdrop. Logs arrive,
 analysts triage them, and nothing an attacker does is constrained by where they
 are.
 
-**Voltgrid is built the other way round.** A 75-host power utility with a real
+**Voltgrid is built the other way round.** A 74-host power utility with a real
 Active Directory forest, a real DMZ, and a genuinely segmented OT enclave
 running gas-turbine plant equipment. Three Security Onion sensors watch it from
 three different vantage points — and *which sensor sees an event tells you
@@ -25,6 +25,12 @@ reconstructs from evidence.
 manager, a search node and three sensors. Suricata and Zeek on every mirrored
 segment. Elastic Agent on 42 Windows endpoints feeding process and file
 telemetry into the same platform.
+
+**One place to look.** Network evidence, endpoint telemetry, web and proxy
+access logs, and firewall and router syslog all land in the same platform,
+parsed into their own datasets — so correlating a proxy request with the
+process that made it and the firewall rule that allowed it is one investigation,
+not three.
 
 **Six analyst positions plus a forensics bench** — SIFT, REMnux and FLARE on the same segment — with tooling ready — and
 deliberately excluded from the emulated-user population, so an analyst's own
