@@ -128,9 +128,16 @@ range finish booting — it covers hosts that do not exist yet, which
 - `verify_vars.py` — Jinja references with no definition, and **role scope**:
   a play referencing a role default without including that role. It exits 3 on
   a scope error and the build ABORTS, because such a reference resolves in YAML
-  and only fails on the range. Expected warning count is **2**:
-  `billing_secret_key` and `pfsense_stale_gateways`, both intentional
-  `| default(...)` references.
+  and only fails on the range.
+
+  Expected warning count against the STAGE is **4**:
+
+  | Var | Where | Why it is expected |
+  |---|---|---|
+  | `billing_secret_key` | `roles/billing_site` | intentional `\| default(...)` |
+  | `pfsense_stale_gateways` | `roles/pfsense_firewall` | intentional `\| default(...)` |
+  | `nat` | `roles/vyos` | base role, only present in the stage |
+  | `splunk_admin_password` | `roles/handlers` | base role's Splunk handlers; no listener triggers them here |
 - `verify_shell_args.py` — an apostrophe in a PowerShell or shell comment
   inside a free-form module argument makes the PLAY FAIL TO LOAD. Ansible runs
   `split_args()` over those arguments and counts quotes; it does not know the
@@ -139,9 +146,11 @@ range finish booting — it covers hosts that do not exist yet, which
 - `verify_so_inventory.py` — an SO host in `[so_all]` but not `[linux]` has
   roles to run and no way to log in.
 
-Run `verify_vars.py` against the STAGE, not the repo root: the stage includes
-base roles copied from `../range-development-ansible/`, so some references
-only appear there.
+**Run `verify_vars.py` against the STAGE, not the repo root.** The stage
+includes base roles copied from `../range-development-ansible/`, so `nat` and
+`splunk_admin_password` appear only there — the repo root reports 2 and you
+would wrongly conclude the baseline had changed. `build_tarball.sh` already
+runs it against the stage; run it by hand the same way.
 
 ## Secrets
 
