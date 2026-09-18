@@ -32,7 +32,7 @@ minutes rather than after a multi-hour baseline.
 | Phase | Does |
 |---|---|
 | `10-mirror` | nginx on the controller serving the SO source, detection content and container registry artifacts |
-| `arbitr_pp_playbook.yaml` | the range baseline — network, AD, hosts, services |
+| `playbooks/00-baseline.yml` | the range baseline — network, AD, hosts, services |
 | `05-time` | Windows clock correction, DC-first |
 | `20-vyos` | GRE tunnels + `tc` mirror rules to the sensors |
 | `30-prereqs` | `so_base` on every grid node |

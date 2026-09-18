@@ -235,3 +235,4 @@ id_rsa
 id_rsa*
 id_ed25519*
 .ssh/
+docs/security-onion/blueprint-additions.yml
