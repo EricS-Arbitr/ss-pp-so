@@ -1,32 +1,41 @@
-# CLAUDE.md — ss-pp-ab onboarding guide
+# CLAUDE.md — ss-pp-so onboarding guide
 
 This file provides guidance to Claude Code (claude.ai/code) and to human developers picking up the PowerPlant range overlay. Read this first.
 
 ## What this project is
 
-This directory (`ss-pp-ab/`) is a **range-specific Ansible overlay** for the **PowerPlant** cyber-range scenario (`voltgrid.com` domain) deployed on the **SimSpace NG** platform. It is NOT a standalone playbook — it layers on top of the customer's shared platform repo at `../range-development-ansible/`. See [range-development-ansible/CLAUDE.md](../range-development-ansible/CLAUDE.md) for the platform-level architecture.
+This directory (`ss-pp-so/`) is a **range-specific Ansible overlay** for the **PowerPlant** cyber-range scenario (`voltgrid.com` domain) deployed on the **SimSpace NG** platform, with **Security Onion 2.4** as the range's SIEM. It is NOT a standalone playbook — it layers on top of the customer's shared platform repo at `../range-development-ansible/`. See [range-development-ansible/CLAUDE.md](../range-development-ansible/CLAUDE.md) for the platform-level architecture.
 
-Two-sentence summary: `range-development-ansible` ships base roles and a reference playbook. `ss-pp-ab` ships range-specific inventory + host_vars + group_vars + custom roles + a range-specific playbook (`arbitr_pp_playbook.yaml`), bundles selected base roles + the custom overlays into a tarball (`build_tarball.sh` → `ab_pp.tgz`), and the tarball deploys to `/etc/ansible` on the range's Ansible host where `deploy.sh` runs the playbook.
+Two-sentence summary: `range-development-ansible` ships base roles and a reference playbook. `ss-pp-so` ships range-specific inventory + host_vars + group_vars + custom roles + a range-specific playbook (`arbitr_pp_playbook.yaml`), bundles selected base roles + the custom overlays into a tarball (`build_tarball.sh` → `ab_pp.tgz`), and the tarball deploys to `/etc/ansible` on the range's Ansible host where `deploy.sh` runs `site.yml`.
 
 ## Repo layout (just this directory)
 
 ```
-ss-pp-ab/
+ss-pp-so/
 ├── CLAUDE.md                    ← you are here
-├── README.md                    ← just says "temp repo"; ignore
-├── PROJECT_LOG.md               ← chronological build history (Apr–May 2026)
+├── README.md                    ← what this repo is, build/deploy in brief
+├── PROJECT_LOG.md               ← chronological build history
 ├── ACTION_PLAN.md               ← original phased plan (mostly done)
-├── UPSTREAM_FIXES.md            ← ★ running log of customer-repo bugs/gaps + overlay workarounds
-├── arbitr_pp_playbook.yaml      ← the range's playbook (30+ plays)
+├── UPSTREAM_FIXES.md            ← ★ customer-repo bugs/gaps + overlay workarounds
+├── site.yml                     ← ★ the entry point; baseline + every SO phase
+├── arbitr_pp_playbook.yaml      ← the range baseline (phase 0 of site.yml)
+├── playbooks/                   ← 05-time 10-mirror 20-vyos 30-prereqs 40-manager
+│                                  50-nodes 60-verify 70-analyst 75-endpoint
+│                                  80-fleet-integrations
 ├── hosts                        ← inventory
-├── group_vars/                  ← all.yml, linux.yml, windows.yml, pfsense.yml, vyos_routes_only.yml, voltgrid.yml, proxy.yml
-├── host_vars/                   ← one yaml per managed host (51 files)
+├── group_vars/                  ← all/ (main.yml, security_onion.yml, vault.yml) + per-group
+├── host_vars/                   ← one yaml per managed host
 ├── roles/                       ← custom roles that override or supplement base roles
-├── build_tarball.sh             ← auto-discovers roles from playbook, bundles ab_pp.tgz
-├── deploy.sh                    ← runs ansible-playbook (3 attempts on failure)
-├── verify_vars.py               ← Jinja-var presence checker (run as part of build_tarball.sh)
-├── requirements.yml             ← Ansible Galaxy collections (currently pfsensible.core)
-└── ab_pp.tgz                    ← built artifact (gitignored in practice; rebuild with build_tarball.sh)
+├── docs/                        ← RANGE_GUIDE.md, RANGE_OVERVIEW.md, security-onion/
+├── build_tarball.sh             ← auto-discovers roles, validates, bundles ab_pp.tgz
+├── deploy.sh                    ← runs site.yml (see the retry model below)
+├── verify_vars.py               ← Jinja-var presence + role-scope checker
+├── verify_shell_args.py         ← ★ refuses plays Ansible's split_args() cannot parse
+├── verify_so_inventory.py       ← refuses an SO host in [so_all] but not [linux]
+├── requirements.yml             ← Ansible Galaxy collections
+├── collections/                 ← vendored pfsensible.core (never fetched at deploy time)
+├── rules/                       ← bundled ETOPEN ruleset
+└── ab_pp.tgz                    ← built artifact; rebuild with build_tarball.sh
 ```
 
 Custom roles currently in `roles/` (those not in the base repo, or that override it):
@@ -42,89 +51,152 @@ Custom roles currently in `roles/` (those not in the base repo, or that override
 | `strip_apipa` | Removes 169.254.x.x addresses Windows assigns when DHCP-then-static handoff lags. |
 | `additional_dc` | Promotes pp-dc02 into the existing voltgrid.com forest (no sibling role in base repo). |
 | `network_discovery` | Suppresses the Win10/11 "Public / Private network" Pop-up + enables network discovery. |
+| `init` | Overlay of the base role. Waits for WinRM, then repairs and PINS the default-gateway ARP entry — an impostor MAC answers ARP, and ICMP, for the gateway on some segments, so the gateway pings while nothing routes off-subnet. |
+| `so_apt_mirror` | nginx on the controller serving the SO source snapshot, airgap detection content, ETOPEN rules, and the container-registry artifacts it builds with skopeo. |
+| `so_base` | Prerequisites on every grid node: packages, proxy, SO source staging. |
+| `so_manager` | Renders the answer file, seeds the container registry from the mirror, runs `so-setup`, verifies the outcome rather than the exit code. |
+| `so_search` | Search node install + grid join. |
+| `so_sensor` | Sensor install + grid join, GRE decap, Zeek/Suricata. |
+| `so_fleet_integrations` | Host-scoped log sources into Fleet on dedicated agent policies — nginx, squid, pfSense, VyOS. Drives the Fleet API directly. |
+| `elastic_agent` | Installs and enrols the Elastic Agent on every endpoint, from installers staged on the controller's mirror. |
+| `vyos_mirror` | GRE tunnels + `tc` mirror rules feeding the sensors. |
 
-## Deploy structure (changed 2026-07-30)
+## Deploy structure
 
-`site.yml` is now the entry point, not `arbitr_pp_playbook.yaml`:
+`site.yml` is the entry point. The order is load-bearing:
 
 ```yaml
-- import_playbook: arbitr_pp_playbook.yaml   # phase 0 — the range baseline
-- import_playbook: playbooks/10-mirror.yml   # SO source + airgap content mirror
-- import_playbook: playbooks/20-vyos.yml     # GRE tunnels + tc mirror rules
-- import_playbook: playbooks/30-prereqs.yml  # so_base on all SO nodes
-- import_playbook: playbooks/40-manager.yml  # MUST complete before 50
-- import_playbook: playbooks/50-nodes.yml    # search + sensor grid-join
+- import_playbook: playbooks/10-mirror.yml    # FIRST — see below
+- import_playbook: arbitr_pp_playbook.yaml    # phase 0 — the range baseline
+- import_playbook: playbooks/05-time.yml      # Windows clock, DC-first
+- import_playbook: playbooks/20-vyos.yml      # GRE tunnels + tc mirror rules
+- import_playbook: playbooks/30-prereqs.yml   # so_base on all SO nodes
+- import_playbook: playbooks/40-manager.yml   # MUST complete before 50
+- import_playbook: playbooks/50-nodes.yml     # search + sensor grid-join
 - import_playbook: playbooks/60-verify.yml
+- import_playbook: playbooks/70-analyst.yml   # analyst workstation enablement
+- import_playbook: playbooks/75-endpoint.yml  # Sysmon, then Elastic Agent
+- import_playbook: playbooks/80-fleet-integrations.yml
 ```
 
-Ported from `so-ansible`, where the phases were validated end to end on a
-fresh range. **so-ansible's `00-setup.yml` is deliberately NOT imported** —
-`arbitr_pp_playbook.yaml` already runs `init` + `common` across this range,
-including the five SO nodes, and running both would do two NetworkManager /
-netplan passes with a reboot each.
+**10-mirror runs ahead of the range baseline** for two reasons. It fails fast:
+the mirror is a hard prerequisite for phases 30/40/50, and discovering it is
+broken after a multi-hour baseline wastes the whole run. And it overlaps: it
+kicks the 7.2 GB container-image build off in the background and returns, so
+the baseline and phases 20/30 run while it downloads. `40-manager` blocks on
+the artifacts. Safe to hoist because the controller is in
+`[ansible_controller]` + `[infrastructure]` only — never `[linux]` — so
+nothing the baseline does is a precondition.
 
-`deploy.sh` runs `site.yml`. During development run one phase directly
-(`ansible-playbook playbooks/40-manager.yml`) rather than re-running ~30
-plays across ~30 hosts.
+**so-ansible's `00-setup.yml` is deliberately NOT imported.**
+`arbitr_pp_playbook.yaml` already runs `init` + `common` across this range
+including the SO nodes, and running both would do two NetworkManager/netplan
+passes with a reboot each.
 
-Three tooling changes were needed to support this, all easy to regress:
-- `build_tarball.sh` scans **every** playbook under `playbooks/`, not just
-  `$PLAYBOOK`, and its role extractor now understands `import_role`/
-  `include_role` as well as `roles:` blocks. `vyos_mirror` is referenced only
-  via `import_role` + `tasks_from`, so without that it was silently never
-  bundled.
-- `TAR_PATHS` gained `site.yml`, `playbooks`, `ansible.cfg`.
-- `verify_vars.py` learned to recurse into `group_vars/all/`, treat `vault_*`
-  as defined, parse FQCN `ansible.builtin.set_fact`, and read play-level
-  `vars:` blocks. **Expected warning count is 3**: `billing_secret_key`,
-  `nat`, `pfsense_stale_gateways` — all intentional `| default(...)`
-  references. `unlisted` and `missing` were false positives from a greedy
-  regex that swallowed task-level `vars:` blocks; fixed 2026-08-05.
+**80-fleet-integrations must follow 75-endpoint.** Enrolment puts every
+endpoint on `endpoints-initial`; that phase then moves the log-source hosts
+onto dedicated policies. Run it first and there is no agent to reassign.
 
-  Note: run it against the STAGE, not the repo root. The stage includes base
-  roles copied from `../range-development-ansible/`, so `nat` (in
-  `roles/vyos/tasks/main.yml`) only appears there. Against the repo root you
-  see 2 and would wrongly conclude the baseline had changed.
+During development run one phase directly (`ansible-playbook
+playbooks/40-manager.yml`) rather than re-running the baseline across ~45
+hosts.
 
-## Secrets — ansible-vault (added 2026-07-30)
+### The retry model
 
-Every credential lives in `group_vars/all/vault.yml`, password `simspace1`.
-`group_vars/all.yml` became `group_vars/all/main.yml` so the vault can sit
-beside it. `ansible.cfg` (new) points `vault_password_file` at
-`/home/simspace/.vault_pass`, which **does not persist across range
-spin-ups** — `deploy.sh` fails closed with the recreate command if it is
-missing.
+`deploy.sh` makes up to three attempts, and attempt 2 is **not** a success
+condition:
+
+1. full sweep
+2. retry-file scope — a REPAIR PASS over the hosts that failed. It never
+   breaks out of the loop however well it goes.
+3. full sweep — this is what actually confirms the range
+
+The retry file lists hosts that FAILED. Repairing them does not run the plays
+whose targets were dropped when they failed, so a clean repair pass is not a
+deployed range. Attempt 3 is the confirmation.
+
+`FORKS` is DERIVED, not chosen: the largest single play target plus a small
+margin, so the widest play runs in one batch. Recount when hosts are added.
+`BOOT_DELAY` (default 180s, `BOOT_DELAY=0` to skip) lets a freshly provisioned
+range finish booting — it covers hosts that do not exist yet, which
+`wait_for_connection` cannot.
+
+### Build-time gates
+
+`build_tarball.sh` refuses to write an archive that would not deploy:
+
+- `verify_vars.py` — Jinja references with no definition, and **role scope**:
+  a play referencing a role default without including that role. It exits 3 on
+  a scope error and the build ABORTS, because such a reference resolves in YAML
+  and only fails on the range. Expected warning count is **2**:
+  `billing_secret_key` and `pfsense_stale_gateways`, both intentional
+  `| default(...)` references.
+- `verify_shell_args.py` — an apostrophe in a PowerShell or shell comment
+  inside a free-form module argument makes the PLAY FAIL TO LOAD. Ansible runs
+  `split_args()` over those arguments and counts quotes; it does not know the
+  script has comments. The file is still valid YAML, which is exactly why this
+  check is separate from `verify_vars.py`.
+- `verify_so_inventory.py` — an SO host in `[so_all]` but not `[linux]` has
+  roles to run and no way to log in.
+
+Run `verify_vars.py` against the STAGE, not the repo root: the stage includes
+base roles copied from `../range-development-ansible/`, so some references
+only appear there.
+
+## Secrets
+
+Every credential lives in `group_vars/all/vault.yml`, encrypted with
+ansible-vault. `group_vars/all.yml` is `group_vars/all/main.yml` so the vault
+sits beside it. `ansible.cfg` points `vault_password_file` at
+`/home/simspace/.vault_pass` on the controller, which **does not persist
+across range spin-ups** — `deploy.sh` fails closed with the recreate command
+when it is missing.
 
 ```bash
-ansible-vault view group_vars/all/vault.yml --vault-password-file .vault_pass
-ansible-vault edit group_vars/all/vault.yml --vault-password-file .vault_pass
+ansible-vault view group_vars/all/vault.yml --vault-password-file /home/simspace/.vault_pass
+ansible-vault edit group_vars/all/vault.yml --vault-password-file /home/simspace/.vault_pass
 ```
+
+**Do not write the vault password into this repo.** It is public. The password
+file itself is gitignored; so are `*.pem`, `*.p12`, `*.pfx`, `id_rsa*` and
+`.ssh/`.
+
+**Tasks that embed a credential in a shell command carry `no_log`.** Ansible
+echoes `cmd` verbatim on failure and `deploy.sh` tees that to
+`/var/log/playbook_run.log`, so without it a failure writes the Domain Admin
+password to disk in clear. Where the task's output was the diagnostic, it
+keeps `failed_when: false` and a following task surfaces stdout only, never
+the command. Credentials passed as MODULE PARAMETERS need nothing — the
+`microsoft.ad` and `ansible.windows` collections mark those `no_log` in their
+own argspec.
 
 ## Build and deploy workflow
 
 ```bash
 # Build the tarball (run from this directory)
-./build_tarball.sh                    # writes ab_pp.tgz
+./build_tarball.sh                    # writes ab_pp.tgz; refuses if a gate fails
 
-# Inspect the playbook order
-grep '^- name:' arbitr_pp_playbook.yaml
+# Inspect what will run, in order
+grep 'import_playbook' site.yml
 
-# On the Ansible host (after copying ab_pp.tgz over and extracting to /etc/ansible)
-./deploy.sh                           # runs ansible-playbook with 3-attempt retry
+# On the Ansible host (tarball extracted to /etc/ansible)
+./deploy.sh                           # site.yml, up to 3 attempts
+BOOT_DELAY=0 ./deploy.sh              # skip the boot wait on an already-up range
 
-# Direct playbook run (on the Ansible host)
-ansible-playbook arbitr_pp_playbook.yaml
-ansible-playbook arbitr_pp_playbook.yaml --tags pfsense       # tag-scoped slice
-ansible-playbook arbitr_pp_playbook.yaml --limit pp-ot-firewall
+# Single phase, during development
+ansible-playbook playbooks/40-manager.yml
+ansible-playbook site.yml --tags pfsense
+ansible-playbook site.yml --limit pp-ot-firewall
 ```
 
-`build_tarball.sh` auto-discovers roles from `arbitr_pp_playbook.yaml`'s `roles:` blocks (plus meta dependencies), pulls each from `../range-development-ansible/roles/` first then overrides with the local `./roles/`. **Don't manually edit the role list in build_tarball.sh — add a role by referencing it in a play.**
-
-`verify_vars.py` runs at the end of `build_tarball.sh` and warns about Jinja `{{ var }}` references that don't resolve from any `group_vars`, `host_vars`, or `role/defaults`. The three current "expected" warnings are `billing_secret_key`, `pfsense_stale_gateways` and `unlisted` (updated 2026-08-04). The first two have `| default(...)` filters and are intentional; `unlisted` is a false positive — a task-level `vars:` entry in `playbooks/75-endpoint.yml`, which verify_vars.py does not parse.
-
-**Role-scope checking (added 2026-08-05).** verify_vars.py detects a play referencing a role default without including that role — the class that failed at run time three times (`so_bundled_rules_filename` 2026-07-29, `so_mirror_root` + `so_agent_installer_*` 2026-08-04). It exits **3** on a scope error and `build_tarball.sh` ABORTS, because such a reference resolves in YAML and only fails on the range. Exit 1 is the soft-warning path and is advisory.
-
-Granularity is per file, not per play: a role used anywhere in a playbook satisfies references anywhere in it. That can miss a genuine error but cannot invent one — the right trade for a check that fails the build. Variables shared across plays belong in `group_vars/all/`, with a pointer comment left in the role's defaults.
+`build_tarball.sh` auto-discovers roles from **every** playbook under
+`playbooks/` as well as `site.yml` and `arbitr_pp_playbook.yaml`, and its role
+extractor understands `import_role` / `include_role` as well as `roles:`
+blocks — `vyos_mirror` is referenced only via `import_role` + `tasks_from`, so
+without that it is silently never bundled. Each role is pulled from
+`../range-development-ansible/roles/` first, then overridden by the local
+`./roles/`. **Don't edit the role list in build_tarball.sh — add a role by
+referencing it in a play.**
 
 ## Network topology (the mental model)
 
@@ -195,16 +267,21 @@ Hosts belong to multiple overlapping groups. Group meanings:
 - **Posture**: `ae` (attack emulation hosts — pp-dc01/02, pp-file, pp-sql, pp-mail), `aue` (attack-user-experience workstations).
 - **OS version**: `win10`, `win11`, `winserver2022`, `winserver2019`.
 - **Services**: `global_dns`, `hunt`, `voltgrid:children` (workstations + DCs + corporate_servers).
+- **Security Onion**: `so_manager`, `so_search`, `so_sensor`, `so_all:children`, `so_mirror_routers` (the VyOS routers that carry a GRE mirror), `ansible_controller` (the mirror host — deliberately NOT in `[linux]`).
 - **Special**: `unmanaged` — hard-coded; not targeted by any play. Contains OT PLCs/HMIs that come pre-configured from their image.
+
+**Group names are load-bearing.** The `so_*` roles address them by name via
+`groups['so_manager']`, `groups['so_all']`, `groups['so_sensor']`. Renaming one
+here without renaming it in the roles breaks the grid silently.
 
 ## Variable hierarchy (lowest → highest precedence)
 
-1. `group_vars/all.yml` — credentials, proxy, syslog server IP.
+1. `group_vars/all/` — `main.yml` (proxy, syslog server IP, shared tunables), `security_onion.yml` (the whole SO stack: pins, registry, subnets), `vault.yml` (credentials, encrypted).
 2. `group_vars/<group>.yml` — `linux.yml`, `windows.yml`, `pfsense.yml`, `vyos_routes_only.yml`, `voltgrid.yml`, `proxy.yml`.
 3. `host_vars/<host>.yml` — per-host IPs/interfaces/role-specific tuning.
 4. Inline play vars in `arbitr_pp_playbook.yaml`.
 
-Notable shared variables (defined in `group_vars/all.yml`):
+Notable shared variables (defined under `group_vars/all/`):
 - `inet_proxy_addr` / `inet_proxy_port` — corporate proxy (10.255.240.1:3128) for any `apt`/`pip`/`win_get_url` traffic.
 - `syslog_server_ip` (`172.16.2.9`) — referenced by the three syslog-client plays.
 
@@ -223,9 +300,9 @@ Notable shared variables (defined in `group_vars/all.yml`):
 5. **Static-route comments cite the destination.** Every `next_hop` value gets an inline comment naming the device on the other end (e.g., `next_hop: "172.16.0.25" # pp-internal-firewall (vmx1 INTERNAL on 172.16.0.24/30)`). This single convention has prevented a known recurring bug class — confusing the local /30 IP with the peer's /30 IP and creating a self-loop default.
 
 6. **Two ansible_user accounts, two truths**:
-   - **pfSense** (`group_vars/pfsense.yml`): `admin:simspace1`. `simspace` user exists but lacks write access to `/cf/conf/config.xml` (a known pfsensible.core fallback-path issue).
-   - **Linux** (`group_vars/linux.yml`): `simspace:Simspace1!` with `become: true` for root tasks.
-   - **VyOS** (`group_vars/vyos_routes_only.yml` and equivalent in customer's `group_vars/vyos.yml`): `vyos:Simspace1!`.
+   - **pfSense** (`group_vars/pfsense.yml`): user `admin` (password in the vault). The `simspace` user exists but lacks write access to `/cf/conf/config.xml` (a known pfsensible.core fallback-path issue).
+   - **Linux** (`group_vars/linux.yml`): user `simspace` with `become: true` for root tasks.
+   - **VyOS** (`group_vars/vyos_routes_only.yml` and equivalent in customer's `group_vars/vyos.yml`): user `vyos`.
 
 7. **SimSpace image quirks are platform issues, not Ansible issues.** Document them in UPSTREAM_FIXES.md with severity `platform`. Workarounds go in overlay plays but don't try to "fix" the image from Ansible (e.g., the OT-pfSense:1.0.0 wizard requirement was unrecoverable from Ansible; the new pfSense 2.8.1 image fixed it at the source).
 
@@ -322,13 +399,17 @@ A few things that will save the next session time:
 
 ```
 /etc/ansible/                          ← extracted tarball lives here
-/etc/ansible/arbitr_pp_playbook.yaml
+/etc/ansible/site.yml                   ← what deploy.sh runs
+/etc/ansible/arbitr_pp_playbook.yaml    ← the range baseline (phase 0)
+/etc/ansible/playbooks/                 ← the Security Onion phases
 /etc/ansible/hosts
 /etc/ansible/{host_vars,group_vars,roles}/
 /etc/ansible/deploy.sh
 /etc/ansible/files/                    ← pre-staged installers (if any)
 ~/.ansible/ansible.log                  ← per-run log
 ~/.ansible/retry/                       ← failure retry hostlists
+/var/log/playbook_run.log               ← full run transcript (deploy.sh tees here)
+/opt/so/conf/arbitr-fleet/              ← our Fleet integration JSON, on so-manager
 /home/simspace/.vault_pass              ← vault password (customer convention)
 ```
 
@@ -344,19 +425,49 @@ A few things that will save the next session time:
 
 **Add a new Linux host**: create `host_vars/<name>.yml` with `ansible_host`, `network_interfaces`, add to `[ubuntu22]` and any service groups in `hosts`. The Linux pre-config play picks up NM management automatically.
 
-**Add a Security Onion Fleet integration**: drop the integration JSON into `/opt/so/saltstack/local/salt/elasticfleet/files/integrations/<policy>/` on so-manager and run `so-elastic-fleet-integration-policy-load`. Salt resolves `local/` ahead of `default/`, so this survives the highstate.
+**Add a Security Onion Fleet integration**: add an entry to `so_fleet_integrations` in `roles/so_fleet_integrations/defaults/main.yml` and a JSON template beside the others. Do NOT use `so-elastic-fleet-integration-policy-load` — it walks only hardcoded directories (`endpoints-initial`, `grid-nodes_general`, `grid-nodes_heavy`, `integrations-optional/FleetServer*`), so a directory we add is never read. The role drives `elastic_fleet_integration_create/_update` directly, which also means SO's loader and ours never contend.
+
+Derive the input id, never pattern-match it. The key is `<policy_template>-<input_type>`, and a package's policy template is not always named after the package — squid's is `log`, so its input is `log-udp`, not `squid-udp`:
+
+```bash
+. /usr/sbin/so-elastic-fleet-common
+fleet_api "epm/packages/<pkg>" | jq -r '.item.policy_templates[] | .name as $t | .inputs[] | "\($t)-\(.type)"'
+```
+
+A dedicated policy contains ONLY what you put in it, so moving a host off `endpoints-initial` strips its endpoint telemetry unless the base integrations are mirrored too — `mirror_base: true` does that. And renaming an integration does not replace the old one: `elastic_fleet_integration_check` matches by name, so the previous one stays attached and RUNNING. Add the old name to `so_fleet_retired_integrations` in the same change.
 
 **Forward a new device's syslog to pp-syslog**: VyOS / pfSense are already covered by the platform-targeted plays. For a new Linux host, just adding it to `[linux]` automatically triggers the `Syslog client — Linux` play (excludes `[syslog]` itself).
 
 **Rebuild the tarball**: `./build_tarball.sh`. Check the WARN section at the bottom for unresolved Jinja vars before shipping.
 
-## Last-known-good state (as of the most recent session)
+## Current state
 
-- Three pfSense firewalls (pp-ot-firewall, pp-internal-firewall, pp-external-firewall) on pfSense 2.8.1 image — auth working with `admin:simspace1`, FRR runtime dir creation fix landed but full FRR convergence pending verification.
-- Routing model: eBGP-only-at-edge (pp-isp-router AS 65002 ↔ pp-external-firewall AS 65001), OSPF between the two upstream firewalls, STATIC everywhere else (all VyOS corp routers carry `remove_vyos_bgp: true`; pp-ot-firewall has neither BGP nor OSPF). Verified against host_vars 2026-07-06.
-- Syslog collection wired end-to-end (Linux → rsyslog forwarder; VyOS → `set system syslog host`; pfSense → `<syslog>` block via php -r) into pp-syslog's `/var/log/remote/` store. Splunk removed 2026-09-09: that store now feeds no SIEM. Security Onion receives Linux syslog from each host's own Elastic Agent, and pfSense/VyOS via Agent listeners on pp-syslog.
-- GNOME initial-setup wizard suppressed on Linux desktops.
-- DDNS mgmt-IP leakage stripped from AD DNS.
-- Image-baked stale static defaults on VyOS routers cleaned up via `extra_static_routes_remove`.
+- **Security Onion is the range's only SIEM.** A distributed grid — manager,
+  search node, three sensors. Endpoints report through Elastic Agent; the
+  sensors see traffic through GRE mirrors from the VyOS routers.
+- **Container images come from the controller's mirror, not ghcr.io.** The
+  controller builds `registry.tar` + `registry_image.tar` with skopeo and
+  serves them; `so_manager` stages them before `so-setup` runs, which is the
+  supported airgap path. No in-play system needs internet access. Set
+  `so_registry_artifact_url` to a Nexus base URL and the controller downloads
+  instead of building — no other change needed.
+- **Host-scoped log sources reach SO as parsed datasets**, not raw syslog
+  text: nginx and squid on their own hosts, pfSense and VyOS through the
+  syslog collector. Each sits on a dedicated agent policy that also mirrors
+  the base endpoint integrations, so moving a host does not strip its endpoint
+  telemetry.
+- **Three pfSense firewalls** on the 2.8.1 image, authenticating as `admin`.
+- **Routing**: eBGP-only-at-edge (pp-isp-router AS 65002 ↔ pp-external-firewall
+  AS 65001), OSPF between the two upstream firewalls, static everywhere else.
+  All VyOS corp routers carry `remove_vyos_bgp: true`; pp-ot-firewall has
+  neither BGP nor OSPF.
+- **Syslog** collects to pp-syslog's `/var/log/remote/` store from Linux
+  (rsyslog forward), VyOS (`set system syslog host`) and pfSense (`<syslog>`
+  via php -r).
+- GNOME initial-setup wizard suppressed on Linux desktops; DDNS mgmt-IP
+  leakage stripped from AD DNS; image-baked stale static defaults cleaned up
+  via `extra_static_routes_remove`.
 
-If something on this list doesn't match what you see in a fresh deploy, the most likely cause is an upstream change in the customer repo or a new SimSpace image revision — check UPSTREAM_FIXES.md tail for new entries before re-deriving.
+If something here does not match a fresh deploy, the likely cause is an
+upstream change in the customer repo or a new SimSpace image revision — check
+the tail of UPSTREAM_FIXES.md before re-deriving.
