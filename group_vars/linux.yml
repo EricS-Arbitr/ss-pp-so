@@ -1,8 +1,23 @@
 ansible_connection: ssh
-# xadmin since the 2026-09-24 image refresh; the Linux images previously
-# shipped `simspace`. is-inet is NOT covered by this -- it is an RC-IS-INET
-# appliance with its own credentials pinned in host_vars/is-inet.yml.
-ansible_user: xadmin
+# STILL simspace, and that is not an oversight.
+#
+# The 2026-09-24 image refresh moved Windows and most Linux images to `xadmin`,
+# but RDP_Ubuntu_Desktop_22.04.5 was NOT refreshed -- confirmed by the range
+# team on 2026-09-24: "Ubuntu Desktop 22.04.5 is still behind as simspace".
+#
+# [linux:children] is `ubuntu22` and nothing else, so EVERY Linux host in this
+# range runs that one image: pp-syslog, pp-www, pp-proxy and the five Security
+# Onion nodes. There is no host here that wants the new account.
+#
+# This group was briefly changed to xadmin earlier the same day, before that
+# confirmation arrived. Had it shipped, all eight Linux hosts would have
+# authenticated with a user the image does not have -- including the entire SO
+# grid. Reverted before deploy.
+#
+# When the 22.04.5 image is refreshed, this becomes `xadmin` and
+# vault_linux_password becomes the new value in the same commit. They are one
+# change, not two.
+ansible_user: simspace
 ansible_ssh_pass: "{{ vault_linux_password }}"
 ansible_become_method: sudo
 ansible_become_pass: "{{ vault_linux_password }}"

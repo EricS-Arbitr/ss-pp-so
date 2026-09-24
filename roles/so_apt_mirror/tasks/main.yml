@@ -172,7 +172,13 @@
   ansible.builtin.file:
     path: "{{ so_mirror_root }}/agents"
     state: directory
-    owner: "{{ ansible_user | default('xadmin') }}"
+    # The fallback is 'simspace' and must STAY 'simspace'. This role runs on the
+    # ansible controller, which is `ansible_connection=local` with no
+    # ansible_user set -- so the default is what actually applies, and it sets
+    # ownership to the controller's own local account. That account belongs to
+    # the RC_NG_Ansible image and did not change in the 2026-09-24 refresh.
+    # It is NOT the managed-host connection account and must not track it.
+    owner: "{{ ansible_user | default('simspace') }}"
     group: www-data
     mode: '0755'
 
