@@ -1,5 +1,8 @@
 ansible_connection: ssh
-ansible_user: simspace
+# xadmin since the 2026-09-24 image refresh; the Linux images previously
+# shipped `simspace`. is-inet is NOT covered by this -- it is an RC-IS-INET
+# appliance with its own credentials pinned in host_vars/is-inet.yml.
+ansible_user: xadmin
 ansible_ssh_pass: "{{ vault_linux_password }}"
 ansible_become_method: sudo
 ansible_become_pass: "{{ vault_linux_password }}"

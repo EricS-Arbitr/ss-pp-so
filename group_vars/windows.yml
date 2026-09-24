@@ -6,11 +6,19 @@ ansible_port: 5985
 # group_vars/win10.yml. ansible_become_user must always track ansible_user:
 # `runas` has no separate become password, so a mismatch authenticates the
 # connection and then fails the privilege escalation.
-ansible_user: simspace
+# xadmin since the 2026-09-24 image refresh. The server images previously
+# shipped `simspace`; the workstation images had already moved to `xadmin` in
+# the 2026-08-26 refresh, so both tiers now use the same account and the
+# win10/win11 overrides are no longer carrying a DIFFERENT user -- only a
+# different vault variable. See the note in group_vars/all/main.yml.
+ansible_user: xadmin
 ansible_password: "{{ vault_windows_password }}"
 ansible_python_interpreter: python
 ansible_become_method: runas
-ansible_become_user: simspace
+# Tracks ansible_user, per the note above: `runas` has no separate become
+# password, so a mismatch authenticates the connection and then fails the
+# privilege escalation.
+ansible_become_user: xadmin
 staging_dir_windows: "C:\\temp"
 
 # Common installers

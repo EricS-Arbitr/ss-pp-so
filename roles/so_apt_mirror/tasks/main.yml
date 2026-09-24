@@ -172,7 +172,7 @@
   ansible.builtin.file:
     path: "{{ so_mirror_root }}/agents"
     state: directory
-    owner: "{{ ansible_user | default('simspace') }}"
+    owner: "{{ ansible_user | default('xadmin') }}"
     group: www-data
     mode: '0755'
 
