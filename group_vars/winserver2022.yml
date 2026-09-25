@@ -1,0 +1,26 @@
+---
+# group_vars/winserver2022.yml — RDP_Windows_Server_2022:1.2.5
+#
+# OVERRIDES group_vars/windows.yml for the refreshed 2022 image, exactly as
+# win10.yml and win11.yml do for the refreshed workstation images. Five hosts:
+# pp-dc01, pp-dc02, pp-dcs-ctrl, pp-file, pp-sql.
+#
+# WHY THIS IS A SEPARATE FILE and not a change to windows.yml: the 2019 image
+# is still 1.1.0 and still ships `simspace`. One `windows.yml` cannot serve
+# both, and setting it to xadmin on 2026-09-24 broke all nine servers -- the
+# 2019 four because the account does not exist there, the 2022 five because
+# the vault still held the old password.
+#
+# WHEN THE 2019 IMAGE IS REFRESHED, delete this file and move xadmin back into
+# windows.yml, rather than adding a third near-identical override.
+ansible_user: xadmin
+ansible_password: "{{ vault_windows_xadmin_password }}"
+
+# Tracks ansible_user. `runas` has no separate become password, so a mismatch
+# authenticates the connection and then fails the privilege escalation.
+ansible_become_user: xadmin
+
+# There is deliberately NO `| default(...)` on the password, matching
+# win10.yml: an undefined vault variable fails loudly on the first task, while
+# a defaulted one supplies a wrong password and reproduces the 2400s silent
+# timeout this range just spent an entire run on.

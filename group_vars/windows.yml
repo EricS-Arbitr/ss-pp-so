@@ -6,19 +6,30 @@ ansible_port: 5985
 # group_vars/win10.yml. ansible_become_user must always track ansible_user:
 # `runas` has no separate become password, so a mismatch authenticates the
 # connection and then fails the privilege escalation.
-# xadmin since the 2026-09-24 image refresh. The server images previously
-# shipped `simspace`; the workstation images had already moved to `xadmin` in
-# the 2026-08-26 refresh, so both tiers now use the same account and the
-# win10/win11 overrides are no longer carrying a DIFFERENT user -- only a
-# different vault variable. See the note in group_vars/all/main.yml.
-ansible_user: xadmin
+# simspace, because this group is the LEGACY DEFAULT and the refreshed images
+# override it. Which account a Windows host wants is decided by its IMAGE
+# VERSION, not by whether it is a server:
+#
+#   RDP_Windows_10 / _11          1.2.4   refreshed -> xadmin  (win10/win11.yml)
+#   RDP_Windows_Server_2022       1.2.5   refreshed -> xadmin  (winserver2022.yml)
+#   RDP_Windows_Server_2019       1.1.0   NOT refreshed -> simspace  (here)
+#   RDP_Ubuntu_Desktop_22.04.5    1.1.0   NOT refreshed -> simspace  (linux.yml)
+#
+# 1.2.x shipped xadmin; 1.1.0 did not. Confirmed on 2026-09-25 by the failure
+# pattern: all 36 workstations (1.2.4) connected fine while all nine servers
+# failed, and the range team had already confirmed 22.04.5 (1.1.0) is "still
+# behind as simspace".
+#
+# This group was briefly set to xadmin on 2026-09-24, which broke BOTH server
+# tiers at once -- the 2019 hosts because they have no xadmin, and the 2022
+# hosts because the vault still held the simspace-era password.
+ansible_user: simspace
 ansible_password: "{{ vault_windows_password }}"
 ansible_python_interpreter: python
 ansible_become_method: runas
-# Tracks ansible_user, per the note above: `runas` has no separate become
-# password, so a mismatch authenticates the connection and then fails the
-# privilege escalation.
-ansible_become_user: xadmin
+# Tracks ansible_user: `runas` has no separate become password, so a mismatch
+# authenticates the connection and then fails the privilege escalation.
+ansible_become_user: simspace
 staging_dir_windows: "C:\\temp"
 
 # Common installers

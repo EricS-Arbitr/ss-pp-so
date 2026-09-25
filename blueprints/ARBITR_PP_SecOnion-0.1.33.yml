@@ -1,0 +1,1070 @@
+---
+resources:
+- type: "range.resource.primitive.Subnet::1.0.0"
+  name: "PP-OT-DMZ"
+  properties:
+    cidr: "192.168.90.128/27"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-eng-wkstn-1"
+  properties:
+    image: "global/RDP_Windows_10:1.2.4"
+    networkInterfaces:
+    - name: "PP-Eng-Department"
+      ipAddress: "172.16.4.10"
+      prefix: 24
+    hostname: "pp-eng-wkstn-1"
+    managementInterface:
+      ipAddress: "10.255.240.101"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-remnux"
+  metadata:
+    description: "Remnux"
+  properties:
+    image: "RDP_Remnux:1.2.2"
+    networkInterfaces:
+    - name: "pp-security"
+      ipAddress: "172.16.9.100"
+      prefix: 24
+    hostname: "pp-remnux"
+    managementInterface:
+      ipAddress: "10.255.240.217"
+      position: "FIRST"
+- type: "range.resource.primitive.Subnet::1.0.0"
+  name: "Gas-Turbine"
+  properties:
+    cidr: "192.168.95.0/24"
+- type: "range.resource.primitive.Switch::1.0.0"
+  name: "switch-10"
+  properties: {}
+- type: "range.resource.configuration.ScriptDefinition::1.0.0"
+  name: "download-range-vars-script"
+  properties:
+    cwd: "/etc/ansible"
+    user: "root"
+    content: "wget --no-check-certificate -e use_proxy=yes -e https_proxy=10.255.240.1:3128\
+      \ -O /etc/ansible/ab_pp.tgz  https://raw.githubusercontent.com/EricS-Arbitr/ss-pp-so/332ed4567c40f9ca5c0dd1cb5fbf8155256b8965/ab_pp.tgz\
+      \ && tar -xvzf ab_pp.tgz\n"
+    scriptType: "BASH"
+- type: "range.resource.primitive.Subnet::1.0.0"
+  name: "PP-DMZ"
+  properties:
+    cidr: "172.16.8.0/24"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-www"
+  properties:
+    image: "global/RDP_Ubuntu_Desktop_22.04.5:1.1.0"
+    networkInterfaces:
+    - name: "PP-DMZ"
+      ipAddress: "172.16.8.5"
+      prefix: 24
+    managementInterface:
+      ipAddress: "10.255.240.119"
+      position: "FIRST"
+- type: "range.resource.primitive.Subnet::1.0.0"
+  name: "PP-LS-Department"
+  properties:
+    cidr: "172.16.5.0/24"
+- type: "range.resource.primitive.Switch::1.0.0"
+  name: "switch-8"
+  properties: {}
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-ls-wkstn-1"
+  properties:
+    image: "global/RDP_Windows_10:1.2.4"
+    networkInterfaces:
+    - name: "PP-LS-Department"
+      ipAddress: "172.16.5.10"
+      prefix: 24
+    hostname: "pp-ls-wkstn-1"
+    managementInterface:
+      ipAddress: "10.255.240.105"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-eng-wkstn-4"
+  properties:
+    image: "global/RDP_Windows_10:1.2.4"
+    networkInterfaces:
+    - name: "PP-Eng-Department"
+      ipAddress: "172.16.4.5"
+      prefix: 24
+    hostname: "pp-eng-wkstn-4"
+    managementInterface:
+      ipAddress: "10.255.240.106"
+      position: "FIRST"
+- type: "range.resource.primitive.Subnet::1.0.0"
+  name: "red-net"
+  properties:
+    cidr: "210.210.210.0/24"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-gasplant-plc"
+  properties:
+    image: "global/GasPlantPLC-v19_v25.1.2:1.0.1"
+    networkInterfaces:
+    - name: "Gas-Turbine"
+      ipAddress: "192.168.95.2"
+      prefix: 24
+    skipProvisioning: true
+    hostname: "pp-gasplant-plc"
+    disableRangeAgent: true
+- type: "range.resource.primitive.Switch::1.0.0"
+  name: "switch-1"
+  properties: {}
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-sift"
+  metadata:
+    description: "SANS Investigative Forensic Toolkit"
+  properties:
+    image: "RDP_SIFT:1.1.1"
+    networkInterfaces:
+    - name: "pp-security"
+      ipAddress: "172.16.9.101"
+      prefix: 24
+    hostname: "pp-sift"
+    managementInterface:
+      ipAddress: "10.255.240.218"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "is-inet"
+  properties:
+    image: "RC-IS-INET:1.0.6"
+    networkInterfaces:
+    - name: "Internet"
+      ipAddress: "200.200.200.2"
+    managementInterface:
+      ipAddress: "10.255.240.136"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "win-hunt-3"
+  properties:
+    image: "global/RDP_Windows_10:1.2.4"
+    cpuCount: 4
+    memory: "8192"
+    networkInterfaces:
+    - name: "pp-security"
+      ipAddress: "172.16.9.13"
+      prefix: 24
+    managementInterface:
+      ipAddress: "10.255.240.213"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-ot-firewall"
+  properties:
+    image: "RC_pfSense:1.0.0"
+    networkInterfaces:
+    - name: "switch-4"
+      ipAddress: "172.16.0.50"
+      prefix: 30
+    - name: "switch-8"
+      ipAddress: "192.168.200.201"
+      prefix: 30
+    - name: "PP-OT-DMZ"
+      ipAddress: "192.168.90.129"
+      prefix: 27
+    hostname: "pp-ot-firewall"
+    managementInterface:
+      ipAddress: "10.255.240.190"
+      position: "FIRST"
+- type: "range.resource.configuration.VmConfiguration::1.0.0"
+  name: "download-range-vars"
+  properties:
+    selector:
+      matchInstances:
+      - "ansible"
+    configurationResources:
+    - name: "download-range-vars-script"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-dc01"
+  properties:
+    image: "global/RDP_Windows_Server_2022:1.2.5"
+    networkInterfaces:
+    - name: "PP-Services"
+      ipAddress: "172.16.2.7"
+      prefix: 24
+    hostname: "pp-dc01"
+    managementInterface:
+      ipAddress: "10.255.240.109"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-flare"
+  metadata:
+    description: "FLARE malware analysis workstation"
+  properties:
+    image: "RDP_Windows_Flare:1.2.1"
+    networkInterfaces:
+    - name: "pp-security"
+      ipAddress: "172.16.9.102"
+      prefix: 24
+    hostname: "pp-flare"
+    managementInterface:
+      ipAddress: "10.255.240.219"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "win-hunt-2"
+  properties:
+    image: "global/RDP_Windows_10:1.2.4"
+    cpuCount: 4
+    memory: "8192"
+    networkInterfaces:
+    - name: "pp-security"
+      ipAddress: "172.16.9.12"
+      prefix: 24
+    managementInterface:
+      ipAddress: "10.255.240.212"
+      position: "FIRST"
+- type: "range.resource.configuration.ScriptDefinition::1.0.0"
+  name: "deploy-script"
+  properties:
+    cwd: "/etc/ansible"
+    user: "root"
+    content: "./deploy.sh | tee /var/log/playbook_run.log\n"
+    timeout: 7200
+    scriptType: "BASH"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-bp-wkstn-7"
+  properties:
+    image: "global/RDP_Windows_11:1.2.4"
+    networkInterfaces:
+    - name: "PP-Business-Processing-Department"
+      ipAddress: "172.16.3.8"
+      prefix: 24
+    hostname: "pp-bp-wkstn-7"
+    managementInterface:
+      ipAddress: "10.255.240.110"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-ls-wkstn-4"
+  properties:
+    image: "global/RDP_Windows_11:1.2.4"
+    networkInterfaces:
+    - name: "PP-LS-Department"
+      ipAddress: "172.16.5.5"
+      prefix: 24
+    hostname: "pp-ls-wkstn-4"
+    managementInterface:
+      ipAddress: "10.255.240.111"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-is-wkstn-2"
+  properties:
+    image: "global/RDP_Windows_10:1.2.4"
+    networkInterfaces:
+    - name: "PP-IS-Department"
+      ipAddress: "172.16.6.3"
+      prefix: 24
+    hostname: "pp-is-wkstn-2"
+    managementInterface:
+      ipAddress: "10.255.240.113"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-eng-wkstn-6"
+  properties:
+    image: "global/RDP_Windows_11:1.2.4"
+    networkInterfaces:
+    - name: "PP-Eng-Department"
+      ipAddress: "172.16.4.7"
+      prefix: 24
+    hostname: "pp-eng-wkstn-6"
+    managementInterface:
+      ipAddress: "10.255.240.114"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-ls-wkstn-2"
+  properties:
+    image: "global/RDP_Windows_10:1.2.4"
+    networkInterfaces:
+    - name: "PP-LS-Department"
+      ipAddress: "172.16.5.3"
+      prefix: 24
+    hostname: "pp-ls-wkstn-2"
+    managementInterface:
+      ipAddress: "10.255.240.115"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-ot-router"
+  properties:
+    image: "RC-VyOS-Router:1.1.0"
+    networkInterfaces:
+    - name: "switch-8"
+      ipAddress: "192.168.200.202"
+      prefix: 30
+    - name: "Gas-Turbine"
+      ipAddress: "192.168.95.1"
+      prefix: 24
+    - name: "Gas-Turbine-Sim"
+      ipAddress: "192.168.90.1"
+      prefix: 27
+    - name: "PP-OT-Services"
+      ipAddress: "192.168.90.97"
+    - name: "PP-OT-Ctrl"
+      ipAddress: "192.168.100.1"
+      prefix: 24
+    hostname: "pp-ot-router"
+    managementInterface:
+      ipAddress: "10.255.240.201"
+      position: "LAST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "so-sensor-edge"
+  properties:
+    image: "global/RDP_Ubuntu_Desktop_22.04.5:1.1.0"
+    cpuCount: 8
+    memory: "16384"
+    networkInterfaces:
+    - name: "pp-security"
+      ipAddress: "172.16.9.42"
+      prefix: 24
+    managementInterface:
+      ipAddress: "10.255.240.138"
+      position: "FIRST"
+- type: "range.resource.primitive.Subnet::1.0.0"
+  name: "pp-security"
+  properties:
+    cidr: "172.16.9.0/24"
+- type: "range.resource.primitive.Subnet::1.0.0"
+  name: "Gas-Turbine-Sim"
+  properties:
+    cidr: "192.168.90.0/27"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-dcs-ctrl"
+  properties:
+    image: "global/RDP_Windows_Server_2022:1.2.5"
+    networkInterfaces:
+    - name: "PP-OT-Ctrl"
+      ipAddress: "192.168.100.10"
+      prefix: 24
+    hostname: "pp-dcs-ctrl"
+    managementInterface:
+      ipAddress: "10.255.240.204"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-syslog"
+  properties:
+    image: "global/RDP_Ubuntu_Desktop_22.04.5:1.1.0"
+    networkInterfaces:
+    - name: "PP-Services"
+      ipAddress: "172.16.2.9"
+      prefix: 24
+    managementInterface:
+      ipAddress: "10.255.240.120"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-bp-wkstn-4"
+  properties:
+    image: "global/RDP_Windows_10:1.2.4"
+    networkInterfaces:
+    - name: "PP-Business-Processing-Department"
+      ipAddress: "172.16.3.5"
+      prefix: 24
+    hostname: "pp-bp-wkstn-4"
+    managementInterface:
+      ipAddress: "10.255.240.122"
+      position: "FIRST"
+- type: "range.resource.primitive.Subnet::1.0.0"
+  name: "control-10"
+  properties:
+    cidr: "10.10.0.0/16"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-is-wkstn-4"
+  properties:
+    image: "global/RDP_Windows_11:1.2.4"
+    networkInterfaces:
+    - name: "PP-IS-Department"
+      ipAddress: "172.16.6.5"
+      prefix: 24
+    managementInterface:
+      ipAddress: "10.255.240.125"
+      position: "FIRST"
+- type: "range.resource.primitive.Subnet::1.0.0"
+  name: "PP-Eng-Department"
+  properties:
+    cidr: "172.16.4.0/24"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-eng-wkstn-3"
+  properties:
+    image: "global/RDP_Windows_10:1.2.4"
+    networkInterfaces:
+    - name: "PP-Eng-Department"
+      ipAddress: "172.16.4.4"
+      prefix: 24
+    hostname: "pp-eng-wkstn-3"
+    managementInterface:
+      ipAddress: "10.255.240.126"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-eng-wkstn-7"
+  properties:
+    image: "global/RDP_Windows_11:1.2.4"
+    networkInterfaces:
+    - name: "PP-Eng-Department"
+      ipAddress: "172.16.4.8"
+      prefix: 24
+    hostname: "pp-eng-wkstn-7"
+    managementInterface:
+      ipAddress: "10.255.240.127"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-ctl-wks-03"
+  properties:
+    image: "global/RDP_Windows_10:1.2.4"
+    networkInterfaces:
+    - name: "PP-OT-Ctrl"
+      ipAddress: "192.168.100.103"
+      prefix: 24
+    hostname: "pp-ctl-wks-03"
+    managementInterface:
+      ipAddress: "10.255.240.207"
+      position: "FIRST"
+- type: "range.resource.primitive.Subnet::1.0.0"
+  name: "Internet"
+  properties:
+    cidr: "200.200.200.0/24"
+- type: "range.resource.primitive.Switch::1.0.0"
+  name: "switch-4"
+  properties: {}
+- type: "range.resource.primitive.Subnet::1.0.0"
+  name: "PP-IS-Department"
+  properties:
+    cidr: "172.16.6.0/24"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-external-firewall"
+  properties:
+    image: "RC_pfSense:1.0.0"
+    networkInterfaces:
+    - name: "switch-0"
+      ipAddress: "75.21.1.1"
+      prefix: 30
+    - name: "PP-DMZ"
+      ipAddress: "172.16.8.1"
+      prefix: 24
+    - name: "switch-1"
+      ipAddress: "172.16.0.9"
+      prefix: 30
+    managementInterface:
+      ipAddress: "10.255.240.191"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-is-wkstn-3"
+  properties:
+    image: "global/RDP_Windows_11:1.2.4"
+    networkInterfaces:
+    - name: "PP-IS-Department"
+      ipAddress: "172.16.6.4"
+      prefix: 24
+    hostname: "pp-is-wkstn-3"
+    managementInterface:
+      ipAddress: "10.255.240.129"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-dmz-dns"
+  properties:
+    image: "global/RDP_Windows_Server_2019:1.1.0"
+    networkInterfaces:
+    - name: "PP-DMZ"
+      ipAddress: "172.16.8.4"
+      prefix: 24
+    hostname: "pp-dmz-dns"
+    managementInterface:
+      ipAddress: "10.255.240.130"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-eng-wkstn-2"
+  properties:
+    image: "global/RDP_Windows_10:1.2.4"
+    networkInterfaces:
+    - name: "PP-Eng-Department"
+      ipAddress: "172.16.4.3"
+      prefix: 24
+    hostname: "pp-eng-wkstn-2"
+    managementInterface:
+      ipAddress: "10.255.240.131"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-internal-router"
+  properties:
+    image: "RC-VyOS-Router:1.1.0"
+    networkInterfaces:
+    - name: "pp-security"
+      ipAddress: "172.16.9.1"
+      prefix: 24
+    - name: "switch-10"
+      ipAddress: "172.16.0.41"
+      prefix: 30
+    - name: "switch-3"
+      ipAddress: "172.16.0.26"
+      prefix: 30
+    - name: "switch-4"
+      ipAddress: "172.16.0.49"
+      prefix: 30
+    managementInterface:
+      ipAddress: "10.255.240.192"
+      position: "LAST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-eng-wkstn-8"
+  properties:
+    image: "global/RDP_Windows_11:1.2.4"
+    networkInterfaces:
+    - name: "PP-Eng-Department"
+      ipAddress: "172.16.4.9"
+      prefix: 24
+    hostname: "pp-eng-wkstn-8"
+    managementInterface:
+      ipAddress: "10.255.240.180"
+      position: "FIRST"
+- type: "range.resource.primitive.Subnet::1.0.0"
+  name: "PP-Business-Processing-Department"
+  properties:
+    cidr: "172.16.3.0/24"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "win-hunt-4"
+  properties:
+    image: "global/RDP_Windows_10:1.2.4"
+    cpuCount: 4
+    memory: "8192"
+    networkInterfaces:
+    - name: "pp-security"
+      ipAddress: "172.16.9.14"
+      prefix: 24
+    managementInterface:
+      ipAddress: "10.255.240.214"
+      position: "FIRST"
+- type: "range.resource.primitive.Subnet::1.0.0"
+  name: "PP-OT-Services"
+  properties:
+    cidr: "192.168.90.96/27"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-bp-wkstn-8"
+  properties:
+    image: "global/RDP_Windows_11:1.2.4"
+    networkInterfaces:
+    - name: "PP-Business-Processing-Department"
+      ipAddress: "172.16.3.9"
+      prefix: 24
+    hostname: "pp-bp-wkstn-8"
+    managementInterface:
+      ipAddress: "10.255.240.133"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-ctl-wks-01"
+  properties:
+    image: "global/RDP_Windows_10:1.2.4"
+    networkInterfaces:
+    - name: "PP-OT-Ctrl"
+      ipAddress: "192.168.100.101"
+      prefix: 24
+    hostname: "pp-ctl-wks-01"
+    managementInterface:
+      ipAddress: "10.255.240.205"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "so-sensor-ot"
+  properties:
+    image: "global/RDP_Ubuntu_Desktop_22.04.5:1.1.0"
+    cpuCount: 8
+    memory: "16384"
+    networkInterfaces:
+    - name: "pp-security"
+      ipAddress: "172.16.9.41"
+      prefix: 24
+    managementInterface:
+      ipAddress: "10.255.240.137"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-ctl-wks-04"
+  properties:
+    image: "global/RDP_Windows_10:1.2.4"
+    networkInterfaces:
+    - name: "PP-OT-Ctrl"
+      ipAddress: "192.168.100.104"
+      prefix: 24
+    hostname: "pp-ctl-wks-04"
+    managementInterface:
+      ipAddress: "10.255.240.208"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-gas-sim"
+  properties:
+    image: "global/GenericSimulationWithNewVis_v25.3.5:1.0.1"
+    networkInterfaces:
+    - name: "Gas-Turbine-Sim"
+      ipAddress: "192.168.90.8"
+      macAddress: "A8:6D:04:11:22:01"
+      prefix: 27
+    - name: "Gas-Turbine"
+      ipAddress: "192.168.95.100"
+      macAddress: "A8:6D:04:22:33:01"
+      prefix: 24
+    skipProvisioning: true
+    hostname: "pp-gas-sim"
+    disableRangeAgent: true
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-ctl-wks-02"
+  properties:
+    image: "global/RDP_Windows_10:1.2.4"
+    networkInterfaces:
+    - name: "PP-OT-Ctrl"
+      ipAddress: "192.168.100.102"
+      prefix: 24
+    hostname: "pp-ctl-wks-02"
+    managementInterface:
+      ipAddress: "10.255.240.206"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-ot-hist"
+  properties:
+    image: "global/GasPlantHistorian-v19_v25.1.2:1.0.1"
+    networkInterfaces:
+    - name: "PP-OT-Services"
+      ipAddress: "192.168.90.107"
+      prefix: 27
+    skipProvisioning: true
+    hostname: "pp-ot-hist"
+    disableRangeAgent: true
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "so-sensor-corp"
+  properties:
+    image: "global/RDP_Ubuntu_Desktop_22.04.5:1.1.0"
+    cpuCount: 8
+    memory: "16384"
+    networkInterfaces:
+    - name: "pp-security"
+      ipAddress: "172.16.9.40"
+      prefix: 24
+    managementInterface:
+      ipAddress: "10.255.240.139"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-dc03"
+  properties:
+    image: "global/RDP_Windows_Server_2019:1.1.0"
+    networkInterfaces:
+    - name: "PP-OT-Ctrl"
+      ipAddress: "192.168.100.5"
+      prefix: 24
+    hostname: "pp-dc03"
+    managementInterface:
+      ipAddress: "10.255.240.203"
+      position: "FIRST"
+- type: "range.resource.primitive.Switch::1.0.0"
+  name: "switch-3"
+  properties: {}
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "win-hunt-5"
+  properties:
+    image: "global/RDP_Windows_10:1.2.4"
+    cpuCount: 4
+    memory: "8192"
+    networkInterfaces:
+    - name: "pp-security"
+      ipAddress: "172.16.9.15"
+      prefix: 24
+    managementInterface:
+      ipAddress: "10.255.240.215"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-bp-wkstn-6"
+  properties:
+    image: "global/RDP_Windows_11:1.2.4"
+    networkInterfaces:
+    - name: "PP-Business-Processing-Department"
+      ipAddress: "172.16.3.7"
+      prefix: 24
+    hostname: "pp-bp-wkstn-6"
+    managementInterface:
+      ipAddress: "10.255.240.140"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-file"
+  properties:
+    image: "global/RDP_Windows_Server_2022:1.2.5"
+    networkInterfaces:
+    - name: "PP-Services"
+      ipAddress: "172.16.2.3"
+      prefix: 24
+    hostname: "pp-file"
+    managementInterface:
+      ipAddress: "10.255.240.141"
+      position: "FIRST"
+- type: "range.resource.primitive.Subnet::1.0.0"
+  name: "PP-Services"
+  properties:
+    cidr: "172.16.2.0/24"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "win-hunt-6"
+  properties:
+    image: "global/RDP_Windows_10:1.2.4"
+    cpuCount: 4
+    memory: "8192"
+    networkInterfaces:
+    - name: "pp-security"
+      ipAddress: "172.16.9.16"
+      prefix: 24
+    managementInterface:
+      ipAddress: "10.255.240.216"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "win-hunt-1"
+  properties:
+    image: "global/RDP_Windows_10:1.2.4"
+    networkInterfaces:
+    - name: "pp-security"
+      ipAddress: "172.16.9.11"
+      prefix: 24
+    hostname: "win-hunt-1"
+    managementInterface:
+      ipAddress: "10.255.240.177"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "elgg"
+  properties:
+    image: "global/RC_NG_Ubuntu_16_Elgg:1.1.0"
+    networkInterfaces:
+    - name: "Internet"
+      ipAddress: "200.200.200.205"
+    managementInterface:
+      ipAddress: "10.255.240.142"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-bp-wkstn-3"
+  properties:
+    image: "global/RDP_Windows_10:1.2.4"
+    networkInterfaces:
+    - name: "PP-Business-Processing-Department"
+      ipAddress: "172.16.3.4"
+      prefix: 24
+    hostname: "pp-bp-wkstn-3"
+    managementInterface:
+      ipAddress: "10.255.240.143"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "site-edge-router"
+  properties:
+    image: "RC-VyOS-Router:1.1.0"
+    networkInterfaces:
+    - name: "switch-2"
+      ipAddress: "172.16.0.17"
+      prefix: 30
+    - name: "switch-1"
+      ipAddress: "172.16.0.10"
+      prefix: 30
+    managementInterface:
+      ipAddress: "10.255.240.195"
+      position: "LAST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-is-wkstn-1"
+  properties:
+    image: "global/RDP_Windows_10:1.2.4"
+    networkInterfaces:
+    - name: "PP-IS-Department"
+      ipAddress: "172.16.6.10"
+      prefix: 24
+    hostname: "pp-is-wkstn-1"
+    managementInterface:
+      ipAddress: "10.255.240.144"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-bp-wkstn-5"
+  properties:
+    image: "global/RDP_Windows_11:1.2.4"
+    networkInterfaces:
+    - name: "PP-Business-Processing-Department"
+      ipAddress: "172.16.3.6"
+      prefix: 24
+    hostname: "pp-bp-wkstn-5"
+    managementInterface:
+      ipAddress: "10.255.240.146"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-gasvibsens"
+  properties:
+    image: "global/GasPlantVibrationSensor-v19_v25.1.2:1.0.1"
+    networkInterfaces:
+    - name: "PP-OT-Services"
+      ipAddress: "192.168.90.101"
+      prefix: 27
+    skipProvisioning: true
+    hostname: "pp-gasvibsens"
+    disableRangeAgent: true
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "Red-1"
+  properties:
+    image: "global/RDP_Kali_Desktop_2025:1.2.4"
+    networkInterfaces:
+    - name: "red-net"
+      ipAddress: "210.210.210.2"
+      prefix: 24
+    managementInterface:
+      ipAddress: "10.255.240.147"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "Activity-Emulation"
+  properties:
+    image: "global/AUE-Actuator-photon-5.0-x86_64-0.0.1:1.0.8"
+    networkInterfaces:
+    - name: "red-net"
+      ipAddress: "210.210.210.70"
+      prefix: 24
+    managementInterface:
+      ipAddress: "10.255.240.148"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-proxy"
+  properties:
+    image: "global/RDP_Ubuntu_Desktop_22.04.5:1.1.0"
+    networkInterfaces:
+    - name: "PP-Services"
+      ipAddress: "172.16.2.20"
+      prefix: 24
+    managementInterface:
+      ipAddress: "10.255.240.170"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-ls-wkstn-5"
+  properties:
+    image: "global/RDP_Windows_11:1.2.4"
+    networkInterfaces:
+    - name: "PP-LS-Department"
+      ipAddress: "172.16.5.6"
+      prefix: 24
+    hostname: "pp-ls-wkstn-5"
+    managementInterface:
+      ipAddress: "10.255.240.149"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-internal-firewall"
+  properties:
+    image: "RC_pfSense:1.0.0"
+    networkInterfaces:
+    - name: "switch-2"
+      ipAddress: "172.16.0.18"
+      prefix: 30
+    - name: "switch-3"
+      ipAddress: "172.16.0.25"
+      prefix: 30
+    managementInterface:
+      ipAddress: "10.255.240.197"
+      position: "FIRST"
+- type: "range.resource.primitive.Subnet::1.0.0"
+  name: "PP-OT-Ctrl"
+  properties:
+    cidr: "192.168.100.0/24"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-ls-wkstn-6"
+  properties:
+    image: "global/RDP_Windows_11:1.2.4"
+    networkInterfaces:
+    - name: "PP-LS-Department"
+      ipAddress: "172.16.5.7"
+      prefix: 24
+    hostname: "pp-ls-wkstn-6"
+    managementInterface:
+      ipAddress: "10.255.240.151"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "ansible"
+  properties:
+    image: "global/RC_NG_Ansible:2.1.0"
+    networkInterfaces:
+    - name: "control-10"
+      ipAddress: "10.10.10.10"
+      prefix: 16
+    managementInterface:
+      ipAddress: "10.255.240.152"
+      position: "FIRST"
+- type: "range.resource.primitive.Switch::1.0.0"
+  name: "switch-2"
+  properties: {}
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-eng-wkstn-5"
+  properties:
+    image: "global/RDP_Windows_11:1.2.4"
+    networkInterfaces:
+    - name: "PP-Eng-Department"
+      ipAddress: "172.16.4.6"
+      prefix: 24
+    hostname: "pp-eng-wkstn-5"
+    managementInterface:
+      ipAddress: "10.255.240.153"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-dc02"
+  properties:
+    image: "global/RDP_Windows_Server_2022:1.2.5"
+    networkInterfaces:
+    - name: "PP-Services"
+      ipAddress: "172.16.2.8"
+      prefix: 24
+    hostname: "pp-dc02"
+    managementInterface:
+      ipAddress: "10.255.240.154"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-engws"
+  properties:
+    image: "global/GenericEngineerWorkstation-AH-v19_v25.1.2:1.0.2"
+    networkInterfaces:
+    - name: "Gas-Turbine"
+      ipAddress: "192.168.95.5"
+      prefix: 24
+    skipProvisioning: true
+    hostname: "pp-engws"
+    disableRangeAgent: true
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-sql"
+  properties:
+    image: "global/RDP_Windows_Server_2022:1.2.5"
+    networkInterfaces:
+    - name: "PP-Services"
+      ipAddress: "172.16.2.4"
+      prefix: 24
+    hostname: "pp-sql"
+    managementInterface:
+      ipAddress: "10.255.240.157"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "so-search"
+  properties:
+    image: "global/RDP_Ubuntu_Desktop_22.04.5:1.1.0"
+    cpuCount: 16
+    memory: "32768"
+    networkInterfaces:
+    - name: "pp-security"
+      ipAddress: "172.16.9.35"
+      prefix: 24
+    managementInterface:
+      ipAddress: "10.255.240.135"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-corp-router"
+  properties:
+    image: "RC-VyOS-Router:1.1.0"
+    networkInterfaces:
+    - name: "PP-Services"
+      ipAddress: "172.16.2.1"
+      prefix: 24
+    - name: "PP-Business-Processing-Department"
+      ipAddress: "172.16.3.1"
+      prefix: 24
+    - name: "PP-Eng-Department"
+      ipAddress: "172.16.4.1"
+      prefix: 24
+    - name: "PP-LS-Department"
+      ipAddress: "172.16.5.1"
+      prefix: 24
+    - name: "PP-IS-Department"
+      ipAddress: "172.16.6.1"
+      prefix: 24
+    - name: "switch-10"
+      ipAddress: "172.16.0.42"
+      prefix: 30
+    managementInterface:
+      ipAddress: "10.255.240.199"
+      position: "LAST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "so-manager"
+  properties:
+    image: "global/RDP_Ubuntu_Desktop_22.04.5:1.1.0"
+    cpuCount: 16
+    memory: "32768"
+    networkInterfaces:
+    - name: "pp-security"
+      ipAddress: "172.16.9.30"
+      prefix: 24
+    managementInterface:
+      ipAddress: "10.255.240.134"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-isp-router"
+  properties:
+    image: "RC-VyOS-Router:1.1.0"
+    networkInterfaces:
+    - name: "switch-0"
+      ipAddress: "75.21.1.2"
+      prefix: 30
+    - name: "red-net"
+      ipAddress: "210.210.210.1"
+      prefix: 24
+    - name: "Internet"
+      ipAddress: "200.200.200.1"
+    managementInterface:
+      ipAddress: "10.255.240.189"
+      position: "LAST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-ls-wkstn-3"
+  properties:
+    image: "global/RDP_Windows_10:1.2.4"
+    networkInterfaces:
+    - name: "PP-LS-Department"
+      ipAddress: "172.16.5.4"
+      prefix: 24
+    hostname: "pp-ls-wkstn-3"
+    managementInterface:
+      ipAddress: "10.255.240.159"
+      position: "FIRST"
+- type: "range.resource.primitive.Switch::1.0.0"
+  name: "switch-0"
+  properties: {}
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-bp-wkstn-2"
+  properties:
+    image: "global/RDP_Windows_10:1.2.4"
+    networkInterfaces:
+    - name: "PP-Business-Processing-Department"
+      ipAddress: "172.16.3.3"
+      prefix: 24
+    hostname: "pp-bp-wkstn-2"
+    managementInterface:
+      ipAddress: "10.255.240.163"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-mail"
+  properties:
+    image: "global/RDP_Windows_Server_2019:1.1.0"
+    networkInterfaces:
+    - name: "PP-Services"
+      ipAddress: "172.16.2.5"
+      prefix: 24
+    hostname: "pp-mail"
+    managementInterface:
+      ipAddress: "10.255.240.164"
+      position: "FIRST"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-bp-wkstn-1"
+  properties:
+    image: "global/RDP_Windows_10:1.2.4"
+    networkInterfaces:
+    - name: "PP-Business-Processing-Department"
+      ipAddress: "172.16.3.10"
+      prefix: 24
+    hostname: "pp-bp-wkstn-1"
+    managementInterface:
+      ipAddress: "10.255.240.166"
+      position: "FIRST"
+- type: "range.resource.configuration.VmConfiguration::1.0.0"
+  name: "deploy-script-execution"
+  dependsOn:
+  - "download-range-vars"
+  properties:
+    selector:
+      matchInstances:
+      - "ansible"
+    configurationResources:
+    - name: "deploy-script"
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-dmz-smtp"
+  metadata:
+    labels:
+    - "mail"
+    - "exchange"
+    - "windows"
+    - "edge"
+    - "dmz"
+  properties:
+    image: "global/RDP_Windows_Server_2019:1.1.0"
+    networkInterfaces:
+    - name: "PP-DMZ"
+      ipAddress: "172.16.8.3"
+      prefix: 24
+    hostname: "pp-dmz-smtp"
+    managementInterface:
+      ipAddress: "10.255.240.169"
+      position: "FIRST"
