@@ -109,10 +109,24 @@ global_dns_records:
     value: "mail.outlook.com"
     zone: "outlook.com"
 
-# Windows 10/11 workstation local account (xadmin), used by group_vars/win10.yml
-# and group_vars/win11.yml. The 2026-08-26 image refresh changed the account
-# the workstation images ship; the server images still use simspace /
-# vault_domain-era credentials from vault.yml.
+# The xadmin local account password for every REFRESHED SimSpace Windows image.
+# One secret covers all of them: RDP_Windows_10:1.2.4, RDP_Windows_11:1.2.4 and
+# RDP_Windows_Server_2022:1.2.5. Used by group_vars/win10.yml, win11.yml and
+# winserver2022.yml.
+#
+# IMAGE VERSION IS THE AXIS, not workstation-versus-server. 1.2.x ships
+# `xadmin` with this password; 1.1.0 still ships `simspace` with
+# vault_windows_password from vault.yml, which is why the four
+# RDP_Windows_Server_2019:1.1.0 hosts stay on group_vars/windows.yml.
+#
+# ONE VARIABLE, NOT ONE PER TIER. A separate variable for the 2022 tier was
+# encrypted from a different password, and all five [winserver2022] hosts --
+# pp-dc01, pp-dc02, pp-dcs-ctrl, pp-file, pp-sql -- spent a whole run being
+# rejected with "ntlm: the specified credentials were rejected by the server".
+# Proven on the range 2026-09-25: `xadmin` plus THIS secret authenticates
+# against 1.2.5, and `simspace` does not. Splitting a shared secret per tier to
+# guard against a divergence that had not happened cost a deploy and bought
+# nothing. If the tiers ever do diverge, split it THEN, against a measurement.
 #
 # INLINE-VAULTED HERE rather than added to vault.yml, deliberately. It was
 # produced with `ansible-vault encrypt_string`, which emits a single encrypted
@@ -124,38 +138,13 @@ global_dns_records:
 #
 # If you later consolidate this into vault.yml, delete it from here in the same
 # commit. Two definitions of one variable is a silent precedence puzzle.
-vault_win_workstation_password: !vault |
+vault_windows_xadmin_password: !vault |
           $ANSIBLE_VAULT;1.1;AES256
           61303261393531363463373439653439386633623835633639353661623331333833343437343733
           3234393962656633333337346162393637613239633462300a313131366562626535653331303663
           37316535633466393038653335386461623034663737376131376361353465623666663135353737
           3332366638663837630a356335383735643333356138623965653837353330383637346131343239
           38633362366638313233643636373666643939306264666466313430366462306566
-
-# Windows SERVER 2022 local account (xadmin), used by group_vars/winserver2022.yml
-# for the refreshed RDP_Windows_Server_2022:1.2.5 image. The 2019 image is still
-# 1.1.0 and still ships `simspace`, so it stays on vault_windows_password via
-# group_vars/windows.yml -- see the note there for why image VERSION and not
-# server-vs-workstation is what decides.
-#
-# Inline-vaulted here for the same reasons as the workstation password above:
-# `ansible-vault encrypt_string` emits one value instead of re-encrypting all
-# of vault.yml, which is a short paste and carries no risk of corrupting
-# credentials that already work. It decrypts with the same platform-placed
-# /home/simspace/.vault_pass, so it is equivalent at run time.
-#
-# This holds the same secret as vault_win_workstation_password today -- every
-# refreshed 1.2.x Windows image shares one password. They are kept separate
-# because they track different images on different refresh cycles, and the
-# moment one of those images moves again a shared variable would silently
-# apply the wrong password to the other tier.
-vault_windows_xadmin_password: !vault |
-          $ANSIBLE_VAULT;1.1;AES256
-          62383233343130393530393537623539326466393037636636333637353330653361663239313836
-          3337303238643266366535333134376236616233653237300a313661383733363532366432383837
-          38623063326336313265383437356564646561653236313430646564646238643333383936353665
-          3333353161356566350a343630363933373631353663343839333639303732633063313163366636
-          39326637376263313730376436376238646166616463633863363063366339613432
 
 # --- Mirror fidelity threshold -------------------------------------------
 # Ceiling on Zeek's own capture_loss, asserted by playbooks/60-verify.yml.

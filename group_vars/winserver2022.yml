@@ -6,10 +6,17 @@
 # pp-dc01, pp-dc02, pp-dcs-ctrl, pp-file, pp-sql.
 #
 # WHY THIS IS A SEPARATE FILE and not a change to windows.yml: the 2019 image
-# is still 1.1.0 and still ships `simspace`. One `windows.yml` cannot serve
-# both, and setting it to xadmin on 2026-09-24 broke all nine servers -- the
-# 2019 four because the account does not exist there, the 2022 five because
-# the vault still held the old password.
+# is still 1.1.0 and still ships `simspace`, and one `windows.yml` cannot serve
+# both accounts. Setting it to xadmin outright broke all nine servers, the 2019
+# four because the account does not exist there.
+#
+# IT SHARES THE WORKSTATION SECRET, and that is deliberate. This file held a
+# 2022-only vault variable until 2026-09-25, when all five hosts here were
+# rejected for a whole run with "ntlm: the specified credentials were rejected
+# by the server" -- that variable had been encrypted from a different password.
+# `xadmin` plus vault_windows_xadmin_password authenticates against 1.2.5,
+# proven on the range that day. Every refreshed 1.2.x image shares one secret;
+# one variable holds it.
 #
 # WHEN THE 2019 IMAGE IS REFRESHED, delete this file and move xadmin back into
 # windows.yml, rather than adding a third near-identical override.
