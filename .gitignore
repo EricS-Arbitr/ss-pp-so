@@ -236,3 +236,8 @@ id_rsa*
 id_ed25519*
 .ssh/
 docs/security-onion/blueprint-additions.yml
+# macOS Finder metadata
+.DS_Store
+**/.DS_Store
+*.bak
+*.bak.*
