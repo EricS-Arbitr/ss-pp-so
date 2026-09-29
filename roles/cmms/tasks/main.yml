@@ -63,12 +63,32 @@
         path: "{{ cmms_stage_dir }}"
         state: directory
 
+    # THE PROXY IS NOT OPTIONAL. Every base role that pulls from this Nexus --
+    # chrome, sysmon, firefox, mssentinel -- sets use_proxy with
+    # inet_proxy_addr. This role did not, and the fetch returned HTTP 500 on
+    # 2026-09-29: without the proxy the request reached something that answered,
+    # rather than reaching Nexus at all. A Windows host at this point in the run
+    # has its DNS pointed at the domain controllers, and the forwarders that
+    # would resolve nexus.dev.ng.simspace.lan are configured eleven plays later.
+    #
+    # Retried, because a single-shot fetch turns any Nexus hiccup into a failed
+    # deploy. The base roles do not retry either; that is worth raising upstream
+    # rather than copying.
     - name: Fetch the SQL Server media from Nexus
       ansible.windows.win_get_url:
         url: "{{ cmms_installer_url }}"
         dest: "{{ cmms_stage_dir }}\\SQLServer2022.zip"
+        method: GET
+        follow_redirects: all
+        use_proxy: true
+        proxy_url: "http://{{ inet_proxy_addr }}:{{ inet_proxy_port }}"
+        proxy_use_default_credential: true
         force: false
         validate_certs: false
+      register: cmms_media_fetch
+      until: cmms_media_fetch is succeeded
+      retries: 3
+      delay: 15
       timeout: "{{ cmms_install_timeout }}"
 
     - name: Expand the media
