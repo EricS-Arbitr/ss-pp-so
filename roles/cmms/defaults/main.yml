@@ -17,12 +17,11 @@ cmms_db_name: VoltgridCMMS
 # convention billing_site uses with random.Random(42).
 cmms_seed: 42
 
-# Least privilege: the application login owns its own database and nothing
-# else. `sa` exists because mixed-mode setup requires it, and is not what the
-# scenario's discoverable connection string uses.
+# Least privilege: the application login owns its own database and nothing else.
+# There is no sa password here on purpose — setup runs Windows-auth-only so no
+# secret ever reaches a command line, and `sa` is left disabled.
 cmms_app_login: svc_cmms
 cmms_app_password: "{{ vault_cmms_app_password }}"
-cmms_sa_password: "{{ vault_cmms_sa_password }}"
 
 # SQL Server setup is long and this platform is slow. Bounded so a wedged
 # install fails with a diagnosis instead of hanging a deploy, which is what an

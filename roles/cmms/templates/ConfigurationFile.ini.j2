@@ -10,9 +10,16 @@ INSTANCENAME="{{ cmms_instance }}"
 INSTANCEID="{{ cmms_instance }}"
 IACCEPTSQLSERVERLICENSETERMS="True"
 UPDATEENABLED="False"
-; Mixed mode: the discoverable connection string this scenario turns on is a
-; SQL login, not an integrated-auth one.
-SECURITYMODE="SQL"
+; WINDOWS AUTH ONLY AT INSTALL TIME, DELIBERATELY.
+; SECURITYMODE="SQL" obliges setup to take /SAPWD, and setup serialises that
+; into its settings XML through SqlSecureString, which encrypts it with DPAPI.
+; Over WinRM there is no loaded user profile, DPAPI returns 0x80070005, and
+; setup dies with "There was an error generating the XML document" before it
+; installs anything. Measured on pp-sql 2026-09-29.
+;
+; Mixed mode is enabled after the install by setting LoginMode, which needs no
+; password on a command line and no DPAPI. `sa` stays disabled: this range never
+; uses it, and the login the scenario cares about is svc_cmms.
 SQLSYSADMINACCOUNTS="BUILTIN\Administrators"
 SQLSVCACCOUNT="NT Service\MSSQLSERVER"
 SQLSVCSTARTUPTYPE="Automatic"
