@@ -1,0 +1,31 @@
+---
+# Voltgrid Power CMMS on pp-sql — SQL Server 2022 + the maintenance database.
+
+# Media comes from the in-platform Nexus, like every other Windows installer
+# in this range. Zero egress: nothing here reaches the internet.
+cmms_installer_url: "{{ sql_server_installer }}"
+cmms_stage_dir: 'C:\Windows\Temp\sqlsetup'
+
+# Default instance, so the engine listens on 1433 without an SQL Browser
+# dependency. A named instance would need dynamic ports or an extra service.
+cmms_instance: MSSQLSERVER
+cmms_service_name: MSSQLSERVER
+
+cmms_db_name: VoltgridCMMS
+
+# Fixed so a rebuild reproduces the work-order table exactly, the same
+# convention billing_site uses with random.Random(42).
+cmms_seed: 42
+
+# Least privilege: the application login owns its own database and nothing
+# else. `sa` exists because mixed-mode setup requires it, and is not what the
+# scenario's discoverable connection string uses.
+cmms_app_login: svc_cmms
+cmms_app_password: "{{ vault_cmms_app_password }}"
+cmms_sa_password: "{{ vault_cmms_sa_password }}"
+
+# SQL Server setup is long and this platform is slow. Bounded so a wedged
+# install fails with a diagnosis instead of hanging a deploy, which is what an
+# unbounded install did to airfield-stacked on 2026-09-27.
+cmms_install_timeout: 3600
+cmms_sql_timeout: 600

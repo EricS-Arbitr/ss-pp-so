@@ -12,6 +12,11 @@
 #      build_tarball.sh and are NOT in source here. Extract them from ab_pp.tgz
 #      to a path OUTSIDE the repo and add it to ANSIBLE_ROLES_PATH, so lint
 #      reports only on this repo's own roles.
+#   3. Collections. ansible.windows, community.windows, microsoft.ad, vyos.vyos,
+#      community.general, community.docker, community.crypto and pfsensible.core
+#      must all be installed, or the playbook fails to load entirely and every
+#      deeper finding is masked. A run that opens with "Failed to load ... due to
+#      failing syntax check" is BLIND, not clean.
 profile: production
 
 exclude_paths:

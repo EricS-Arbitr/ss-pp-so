@@ -37,6 +37,10 @@ chrome_installer: "https://nexus.dev.ng.simspace.lan/repository/ng_raw/installer
 firefox_installer: "https://nexus.dev.ng.simspace.lan/repository/ng_raw/installers/Firefox/136.0.1/firefox_setup_136.0.1.msi"
 sysmon_installer: "https://nexus.dev.ng.simspace.lan/repository/ng_raw/installers/Microsoft/sysmon/sysmon64.exe"
 
+# SQL Server 2022 media for the CMMS on pp-sql. Zero egress: this is the
+# in-platform Nexus, the same source as every other installer here.
+sql_server_installer: "https://nexus.dev.ng.simspace.lan/repository/ng_raw/installers/Microsoft/SQL/SQLServer2022.zip"
+
 # Range agent bootstrap (referenced by common role on every Windows host)
 range_agent_bootstrap: range-agent-bootstrap-x64.msi
 range_agent_bootstrap_installer: "https://nexus.dev.ng.simspace.lan/repository/ng_raw/installers/range-agent-bootstrap/{{ range_agent_bootstrap }}"

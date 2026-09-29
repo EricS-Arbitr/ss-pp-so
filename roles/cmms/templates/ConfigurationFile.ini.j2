@@ -1,0 +1,23 @@
+;   SQL Server 2022 unattended install for the Voltgrid CMMS.
+;   Engine only: no SSAS, SSIS, SSRS or full-text. The scenario needs a
+;   relational store and a listener, and every extra feature is install time
+;   and attack surface that earns nothing.
+[OPTIONS]
+ACTION="Install"
+FEATURES=SQLENGINE
+QUIET="True"
+INSTANCENAME="{{ cmms_instance }}"
+INSTANCEID="{{ cmms_instance }}"
+IACCEPTSQLSERVERLICENSETERMS="True"
+UPDATEENABLED="False"
+; Mixed mode: the discoverable connection string this scenario turns on is a
+; SQL login, not an integrated-auth one.
+SECURITYMODE="SQL"
+SQLSYSADMINACCOUNTS="BUILTIN\Administrators"
+SQLSVCACCOUNT="NT Service\MSSQLSERVER"
+SQLSVCSTARTUPTYPE="Automatic"
+AGTSVCACCOUNT="NT AUTHORITY\NETWORK SERVICE"
+AGTSVCSTARTUPTYPE="Disabled"
+BROWSERSVCSTARTUPTYPE="Disabled"
+TCPENABLED="1"
+NPENABLED="0"

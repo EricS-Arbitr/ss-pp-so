@@ -1,0 +1,266 @@
+---
+# =========================================================================
+# Voltgrid Power CMMS — SQL Server 2022 + maintenance database on pp-sql
+# =========================================================================
+# WHY pp-sql HAS A DATABASE AT ALL. It did not. The host has carried the name
+# since the range was built while `[sql2022]` sat unimplemented in
+# ACTION_PLAN.md B5, and billing.voltgrid.com's data has always been SQLite on
+# pp-www. This role makes the name honest and gives the range a maintenance
+# system of record: asset register, work orders, and the scheduled outage
+# windows that say when a unit is off line.
+#
+# EVERY GATE HERE TESTS AN OUTCOME, NOT A PREVIOUS TASK'S `changed`. That is
+# not a style preference — gating installation on a notify is what left Splunk
+# installed-but-never-initialised on airfield-stacked and hung a deploy for
+# twenty hours (UPSTREAM_FIXES 2026-09-27).
+
+- name: Is the SQL Server engine already installed
+  ansible.windows.win_service_info:
+    name: "{{ cmms_service_name }}"
+  register: cmms_service
+  failed_when: false
+
+- name: Does the CMMS database already hold data
+  ansible.windows.win_powershell:
+    script: |
+      $ErrorActionPreference = 'Stop'
+      try {
+        $c = New-Object System.Data.SqlClient.SqlConnection(
+          "Server=localhost;Database={{ cmms_db_name }};Integrated Security=True;TrustServerCertificate=True;Connect Timeout=10")
+        $c.Open()
+        $cmd = $c.CreateCommand()
+        $cmd.CommandText = "SELECT COUNT(*) FROM dbo.work_orders"
+        $n = $cmd.ExecuteScalar()
+        $c.Close()
+        Write-Output ("CMMS_ROWS " + $n)
+      } catch {
+        Write-Output "CMMS_ROWS 0"
+      }
+  register: cmms_rows
+  changed_when: false
+  failed_when: false
+  when: cmms_service.exists | default(false)
+
+- name: Decide what still has to be done
+  ansible.builtin.set_fact:
+    cmms_engine_present: "{{ cmms_service.exists | default(false) | bool }}"
+    cmms_data_present: >-
+      {{ ((cmms_rows.output | default(['CMMS_ROWS 0']) | join(' ')
+           | regex_search('CMMS_ROWS (\d+)', '\1') | first | default(0)) | int) > 0 }}
+
+- name: Report what this run will do
+  ansible.builtin.debug:
+    msg: >-
+      CMMS: engine={{ 'present' if cmms_engine_present else 'WILL INSTALL' }},
+      data={{ 'present' if cmms_data_present else 'WILL SEED' }}
+
+# --- Engine -------------------------------------------------------------
+- name: Install the SQL Server engine
+  when: not cmms_engine_present
+  block:
+    - name: Create the staging directory
+      ansible.windows.win_file:
+        path: "{{ cmms_stage_dir }}"
+        state: directory
+
+    - name: Fetch the SQL Server media from Nexus
+      ansible.windows.win_get_url:
+        url: "{{ cmms_installer_url }}"
+        dest: "{{ cmms_stage_dir }}\\SQLServer2022.zip"
+        force: false
+        validate_certs: false
+      timeout: "{{ cmms_install_timeout }}"
+
+    - name: Expand the media
+      ansible.windows.win_powershell:
+        script: |
+          $ErrorActionPreference = 'Stop'
+          $zip = "{{ cmms_stage_dir }}\SQLServer2022.zip"
+          $dst = "{{ cmms_stage_dir }}\media"
+          if (-not (Test-Path "$dst\setup.exe")) {
+            Expand-Archive -LiteralPath $zip -DestinationPath $dst -Force
+          }
+          $setup = Get-ChildItem -Path $dst -Filter setup.exe -Recurse |
+                   Select-Object -First 1 -ExpandProperty FullName
+          if (-not $setup) {
+            Write-Output ("SETUP_NOT_FOUND contents: " +
+              ((Get-ChildItem -Path $dst -Recurse -Depth 2 |
+                Select-Object -First 40 -ExpandProperty FullName) -join '; '))
+          } else {
+            Write-Output ("SETUP_AT " + $setup)
+          }
+      register: cmms_media
+      timeout: "{{ cmms_install_timeout }}"
+      changed_when: false
+
+    # The archive layout is not documented anywhere we control, so this says
+    # what it actually found rather than failing on a path someone guessed.
+    - name: Fail with the media layout if setup.exe is not in the archive
+      ansible.builtin.fail:
+        msg: |
+          No setup.exe in {{ cmms_installer_url }}.
+
+          {{ cmms_media.output | default([]) | join(' ') }}
+
+          Publish the full SQL Server 2022 media to that Nexus path, or point
+          cmms_installer_url at an archive that contains setup.exe.
+      when: "'SETUP_AT' not in (cmms_media.output | default([]) | join(' '))"
+
+    - name: Render the unattended configuration
+      ansible.windows.win_template:
+        src: ConfigurationFile.ini.j2
+        dest: "{{ cmms_stage_dir }}\\ConfigurationFile.ini"
+      no_log: true
+
+    - name: Run SQL Server setup
+      ansible.windows.win_powershell:
+        script: |
+          $ErrorActionPreference = 'Stop'
+          $setup = "{{ cmms_media.output | join(' ') | regex_replace('^.*SETUP_AT ', '') | trim }}"
+          $p = Start-Process -FilePath $setup -Wait -PassThru -NoNewWindow -ArgumentList @(
+                 '/ConfigurationFile={{ cmms_stage_dir }}\ConfigurationFile.ini',
+                 '/SAPWD={{ cmms_sa_password }}')
+          Write-Output ("SETUP_RC " + $p.ExitCode)
+      register: cmms_setup
+      no_log: true
+      # Bounded. An unbounded installer is how airfield-stacked lost 20 hours.
+      timeout: "{{ cmms_install_timeout }}"
+      changed_when: true
+
+    # SQL Server returns 3010 for "succeeded, reboot pending", which is a
+    # success. Anything else is not.
+    - name: Report the setup result
+      ansible.builtin.debug:
+        msg: "CMMS setup {{ cmms_setup.output | default(['(no output)']) | join(' ') }}"
+
+    - name: Fail if setup did not succeed
+      ansible.builtin.fail:
+        msg: >-
+          SQL Server setup returned
+          {{ cmms_setup.output | default([]) | join(' ') | regex_replace('^.*SETUP_RC ', '') }}.
+          Summary log: C:\Program Files\Microsoft SQL Server\160\Setup Bootstrap\Log\Summary.txt
+      when: not (cmms_setup.output | default([]) | join(' ') is search('SETUP_RC (0|3010)$'))
+
+    - name: Wait for the engine to accept connections
+      ansible.windows.win_service_info:
+        name: "{{ cmms_service_name }}"
+      register: cmms_svc_after
+      until: (cmms_svc_after.services | default([]) | map(attribute='state') | first | default('')) == 'started'
+      retries: 30
+      delay: 10
+
+    - name: Permit SQL Server on the plant network
+      community.windows.win_firewall_rule:
+        name: Voltgrid CMMS — SQL Server
+        localport: 1433
+        action: allow
+        direction: in
+        protocol: tcp
+        state: present
+        enabled: true
+
+# --- Database -----------------------------------------------------------
+# Gated on the DATA being absent, not on the engine having just been
+# installed. A re-run over an existing engine with an empty database must
+# still seed it; a re-run over a seeded one must not touch it.
+- name: Build and seed the CMMS database
+  when: not cmms_data_present
+  block:
+    - name: Stage the schema and seed scripts
+      ansible.windows.win_template:
+        src: "{{ item }}.j2"
+        dest: "{{ cmms_stage_dir }}\\{{ item }}"
+      loop:
+        - schema.sql
+        - seed.sql
+
+    # System.Data.SqlClient is present on every Windows install, so this needs
+    # no SQL client tools and no PowerShell module — one less thing to fetch
+    # from Nexus and one less thing to be absent at run time. GO is a batch
+    # separator the client has to honour, not a statement, so it is split here.
+    - name: Apply the schema and seed, in order
+      ansible.windows.win_powershell:
+        script: |
+          $ErrorActionPreference = 'Stop'
+          $c = New-Object System.Data.SqlClient.SqlConnection(
+            "Server=localhost;Database=master;Integrated Security=True;TrustServerCertificate=True")
+          $c.Open()
+          foreach ($f in @('schema.sql','seed.sql')) {
+            $sql = Get-Content -Raw -LiteralPath "{{ cmms_stage_dir }}\$f"
+            foreach ($batch in ($sql -split '(?im)^\s*GO\s*$')) {
+              if ($batch.Trim().Length -eq 0) { continue }
+              $cmd = $c.CreateCommand()
+              $cmd.CommandText = $batch
+              $cmd.CommandTimeout = {{ cmms_sql_timeout }}
+              [void]$cmd.ExecuteNonQuery()
+            }
+          }
+          $c.Close()
+          Write-Output "CMMS_APPLIED"
+      register: cmms_applied
+      timeout: "{{ cmms_sql_timeout }}"
+      changed_when: "'CMMS_APPLIED' in (cmms_applied.output | default([]) | join(' '))"
+
+    # The login the scenario's discoverable connection string uses. It owns
+    # this database and has no server-level rights — an attacker who finds the
+    # string gets the maintenance data, not the instance.
+    - name: Create the application login and map it to the database
+      ansible.windows.win_powershell:
+        script: |
+          $ErrorActionPreference = 'Stop'
+          $c = New-Object System.Data.SqlClient.SqlConnection(
+            "Server=localhost;Database=master;Integrated Security=True;TrustServerCertificate=True")
+          $c.Open()
+          $batches = @(
+            "IF SUSER_ID('{{ cmms_app_login }}') IS NULL
+               CREATE LOGIN [{{ cmms_app_login }}] WITH PASSWORD = '{{ cmms_app_password }}',
+               CHECK_POLICY = OFF, DEFAULT_DATABASE = [{{ cmms_db_name }}];",
+            "USE [{{ cmms_db_name }}];
+             IF USER_ID('{{ cmms_app_login }}') IS NULL
+               CREATE USER [{{ cmms_app_login }}] FOR LOGIN [{{ cmms_app_login }}];
+             ALTER ROLE db_datareader ADD MEMBER [{{ cmms_app_login }}];
+             ALTER ROLE db_datawriter ADD MEMBER [{{ cmms_app_login }}];"
+          )
+          foreach ($b in $batches) {
+            $cmd = $c.CreateCommand(); $cmd.CommandText = $b; [void]$cmd.ExecuteNonQuery()
+          }
+          $c.Close()
+          Write-Output "CMMS_LOGIN_READY"
+      register: cmms_login
+      no_log: true
+      changed_when: true
+
+# --- Proof --------------------------------------------------------------
+# Runs on EVERY pass, seeded or skipped. A role that only verifies the work it
+# just did cannot tell you the database was emptied between deploys.
+- name: Count what is actually in the database
+  ansible.windows.win_powershell:
+    script: |
+      $ErrorActionPreference = 'Stop'
+      $c = New-Object System.Data.SqlClient.SqlConnection(
+        "Server=localhost;Database={{ cmms_db_name }};Integrated Security=True;TrustServerCertificate=True")
+      $c.Open()
+      $out = @()
+      foreach ($t in @('assets','technicians','vendors','parts','pm_schedules','outage_windows','work_orders')) {
+        $cmd = $c.CreateCommand(); $cmd.CommandText = "SELECT COUNT(*) FROM dbo.$t"
+        $out += ("$t=" + $cmd.ExecuteScalar())
+      }
+      $c.Close()
+      Write-Output ("CMMS_COUNTS " + ($out -join ' '))
+  register: cmms_counts
+  changed_when: false
+
+- name: Report the CMMS contents
+  ansible.builtin.debug:
+    msg: "{{ cmms_counts.output | default(['(no output)']) | join(' ') }}"
+
+- name: Fail if any CMMS table is empty
+  ansible.builtin.fail:
+    msg: |
+      The CMMS database on {{ inventory_hostname }} is incomplete.
+
+      {{ cmms_counts.output | default([]) | join(' ') }}
+
+      Every table should be non-zero. An empty table means the seed did not
+      run, or ran against a different database than the one being counted.
+  when: cmms_counts.output | default([]) | join(' ') is search('=0( |$)')

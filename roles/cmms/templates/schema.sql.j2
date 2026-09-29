@@ -1,0 +1,127 @@
+/* =====================================================================
+   Voltgrid Power — CMMS (computerised maintenance management system)
+   Schema + reference data.  Rendered by roles/cmms.
+
+   WHY THIS EXISTS AS A SCENARIO ASSET
+   -----------------------------------
+   A CMMS is the maintenance system of record for a plant: what equipment
+   exists, how critical each item is, what is broken, and WHEN UNITS ARE
+   SCHEDULED OFF LINE.  That last table is the one with real adversary
+   value -- it names the windows when a unit is down and the crew is busy.
+
+   The asset register deliberately includes the range's own OT hosts
+   (pp-gasplant-plc, pp-gasvibsens, pp-ot-hist, pp-dcs-ctrl) alongside the
+   turbines and pumps, because that correlation is the lesson: an attacker
+   reading this table learns which IP on the OT segment is worth reaching.
+
+   Reference rows are CURATED, not generated -- a plant's asset register is
+   the one table where invented names read as obviously fake.  Volume data
+   (work orders) is generated below with a seeded RAND so the database is
+   reproducible across rebuilds.
+   ===================================================================== */
+
+IF DB_ID('{{ cmms_db_name }}') IS NULL
+    CREATE DATABASE [{{ cmms_db_name }}];
+GO
+USE [{{ cmms_db_name }}];
+GO
+
+IF OBJECT_ID('dbo.work_orders','U')   IS NOT NULL DROP TABLE dbo.work_orders;
+IF OBJECT_ID('dbo.pm_schedules','U')  IS NOT NULL DROP TABLE dbo.pm_schedules;
+IF OBJECT_ID('dbo.outage_windows','U')IS NOT NULL DROP TABLE dbo.outage_windows;
+IF OBJECT_ID('dbo.parts','U')         IS NOT NULL DROP TABLE dbo.parts;
+IF OBJECT_ID('dbo.technicians','U')   IS NOT NULL DROP TABLE dbo.technicians;
+IF OBJECT_ID('dbo.vendors','U')       IS NOT NULL DROP TABLE dbo.vendors;
+IF OBJECT_ID('dbo.assets','U')        IS NOT NULL DROP TABLE dbo.assets;
+GO
+
+CREATE TABLE dbo.assets (
+    asset_id      INT IDENTITY(1,1) PRIMARY KEY,
+    tag           VARCHAR(24)  NOT NULL UNIQUE,
+    name          VARCHAR(80)  NOT NULL,
+    asset_type    VARCHAR(32)  NOT NULL,
+    area          VARCHAR(32)  NOT NULL,
+    criticality   TINYINT      NOT NULL,      -- 1 highest .. 5 lowest
+    manufacturer  VARCHAR(48)  NULL,
+    model         VARCHAR(48)  NULL,
+    serial_no     VARCHAR(48)  NULL,
+    installed_on  DATE         NULL,
+    ip_address    VARCHAR(15)  NULL,          -- populated for the OT assets
+    notes         VARCHAR(400) NULL
+);
+
+CREATE TABLE dbo.technicians (
+    tech_id       INT IDENTITY(1,1) PRIMARY KEY,
+    badge         VARCHAR(12)  NOT NULL UNIQUE,
+    full_name     VARCHAR(64)  NOT NULL,
+    craft         VARCHAR(32)  NOT NULL,
+    shift         VARCHAR(16)  NOT NULL,
+    email         VARCHAR(96)  NULL,
+    phone         VARCHAR(24)  NULL,
+    certification VARCHAR(96)  NULL
+);
+
+CREATE TABLE dbo.vendors (
+    vendor_id     INT IDENTITY(1,1) PRIMARY KEY,
+    name          VARCHAR(64)  NOT NULL,
+    contact       VARCHAR(64)  NULL,
+    email         VARCHAR(96)  NULL,
+    phone         VARCHAR(24)  NULL,
+    contract_no   VARCHAR(32)  NULL,
+    service_level VARCHAR(32)  NULL
+);
+
+CREATE TABLE dbo.parts (
+    part_id       INT IDENTITY(1,1) PRIMARY KEY,
+    part_no       VARCHAR(32)  NOT NULL UNIQUE,
+    description   VARCHAR(96)  NOT NULL,
+    qty_on_hand   INT          NOT NULL,
+    reorder_point INT          NOT NULL,
+    bin           VARCHAR(16)  NULL,
+    unit_cost     DECIMAL(10,2) NULL,
+    vendor_id     INT NULL REFERENCES dbo.vendors(vendor_id)
+);
+
+CREATE TABLE dbo.pm_schedules (
+    pm_id         INT IDENTITY(1,1) PRIMARY KEY,
+    asset_id      INT NOT NULL REFERENCES dbo.assets(asset_id),
+    task          VARCHAR(120) NOT NULL,
+    interval_days INT          NOT NULL,
+    last_done     DATE         NULL,
+    next_due      DATE         NULL,
+    est_hours     DECIMAL(5,1) NULL
+);
+
+/* THE TABLE THAT MATTERS. A scheduled outage is the plant announcing, in
+   writing, exactly when a unit is off line and the crew is committed. */
+CREATE TABLE dbo.outage_windows (
+    outage_id     INT IDENTITY(1,1) PRIMARY KEY,
+    unit          VARCHAR(24)  NOT NULL,
+    starts_on     DATETIME2    NOT NULL,
+    ends_on       DATETIME2    NOT NULL,
+    outage_type   VARCHAR(24)  NOT NULL,      -- Planned / Forced / Maintenance
+    reason        VARCHAR(200) NOT NULL,
+    approved_by   VARCHAR(64)  NULL,
+    status        VARCHAR(16)  NOT NULL
+);
+
+CREATE TABLE dbo.work_orders (
+    wo_id         INT IDENTITY(1,1) PRIMARY KEY,
+    wo_number     VARCHAR(16)  NOT NULL UNIQUE,
+    asset_id      INT NOT NULL REFERENCES dbo.assets(asset_id),
+    wo_type       VARCHAR(16)  NOT NULL,      -- PM / Corrective / Emergency
+    priority      TINYINT      NOT NULL,
+    status        VARCHAR(16)  NOT NULL,
+    opened_on     DATETIME2    NOT NULL,
+    due_on        DATETIME2    NULL,
+    closed_on     DATETIME2    NULL,
+    assigned_to   INT NULL REFERENCES dbo.technicians(tech_id),
+    description   VARCHAR(300) NOT NULL,
+    labor_hours   DECIMAL(6,1) NULL
+);
+GO
+
+CREATE INDEX ix_wo_asset   ON dbo.work_orders(asset_id);
+CREATE INDEX ix_wo_status  ON dbo.work_orders(status);
+CREATE INDEX ix_outage_win ON dbo.outage_windows(starts_on, ends_on);
+GO
