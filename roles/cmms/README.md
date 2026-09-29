@@ -25,7 +25,9 @@ reasons specific to a plant:
   why — that asymmetry is the lesson.
 - **`svc_cmms` is a credential worth finding.** It owns this database and holds
   no server-level rights, so the connection string yields maintenance data, not
-  the instance.
+  the instance. `roles/cmms_client` leaves that string in a plaintext .NET
+  config on the engineering workstations, so the credential is discoverable on
+  an endpoint and the endpoint→database pivot is a playable path.
 
 ## Shape
 

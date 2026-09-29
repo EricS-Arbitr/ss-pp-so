@@ -1,0 +1,29 @@
+---
+# =========================================================================
+# Voltgrid CMMS client config — the discoverable connection string
+# =========================================================================
+# THIS IS A SCENARIO ARTIFACT, not an operational client. It plants a plausible
+# plaintext SQL-auth credential in a .NET app config on the engineering
+# workstations, so an attacker who lands on an engineer's box can read it and
+# pivot to the CMMS database on pp-sql. The lesson is endpoint -> database via
+# a credential left in a config file — the reason roles/cmms created svc_cmms
+# as a least-privilege login that owns its database and nothing else.
+#
+# The credential is PLAINTEXT ON THE HOST on purpose. In this repo it is a
+# vault reference (never a literal), and the template task carries no_log so it
+# stays out of the deploy log. It is the SAME vaulted value roles/cmms creates
+# the login with, so the string actually authenticates against pp-sql:1433.
+#
+# These identifiers MUST match roles/cmms on pp-sql. If the database name or
+# login there changes, change them here too, or the planted string stops
+# working and the scenario path goes dead.
+cmms_client_sql_host: "pp-sql.{{ domain_name }}"
+cmms_client_db_name: VoltgridCMMS
+cmms_client_app_login: svc_cmms
+cmms_client_app_password: "{{ vault_cmms_app_password }}"
+
+# A plausible per-machine install location. The deployed .NET config lives next
+# to its executable as <exe>.config; C:\Program Files\Voltgrid\CMMS Client is
+# where an admin would drop the maintenance client.
+cmms_client_install_dir: 'C:\Program Files\Voltgrid\CMMS Client'
+cmms_client_app_version: "4.2.1"

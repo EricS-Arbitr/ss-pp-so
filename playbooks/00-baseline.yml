@@ -834,6 +834,14 @@
   tags:
     - cmms
 
+- name: cmms_client
+  hosts: engineering
+  gather_facts: false
+  roles:
+    - cmms_client
+  tags:
+    - cmms_client
+
 - name: dns
   hosts: pdc
   gather_facts: false
