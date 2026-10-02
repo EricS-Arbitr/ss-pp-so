@@ -1,5 +1,10 @@
-domain_admin: "simspace"
-domain_admin_password: "{{ vault_domain_admin_password }}"
+# xadmin / vault_windows_xadmin_password matches the released
+# range-development-ansible convention (the 1.2.x image's local admin and the
+# created domain admin share one identity and password). "xadmin" is not a
+# substring of its password, so Windows complexity accepts it. The old simspace
+# domain account is no longer needed now that every Windows image is 1.2.x.
+domain_admin: "xadmin"
+domain_admin_password: "{{ vault_windows_xadmin_password }}"
 cs_certs:
   - "https://nexus.dev.ng.simspace.lan/repository/ng_raw/certificates/DigiCertHighAssuranceEVRootCA.crt"
   - "https://nexus.dev.ng.simspace.lan/repository/ng_raw/certificates/DigiCertGlobalRootG2.crt"
