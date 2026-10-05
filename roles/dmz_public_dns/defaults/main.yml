@@ -1,0 +1,37 @@
+---
+# =========================================================================
+# dmz_public_dns — pp-dmz-dns as the PUBLIC authoritative nameserver for
+# voltgrid.com (the internet-facing view).
+# =========================================================================
+# pp-dmz-dns is a standalone Windows Server in the DMZ (172.16.8.4), NOT
+# domain-joined, so this is a FILE-BACKED primary zone (Add-DnsServerPrimaryZone
+# -ZoneFile), never an AD-integrated one. The corporate/internal view of
+# voltgrid.com stays on the AD DCs (roles/dns on [pdc]); this is split-horizon.
+#
+# Records are the EXTERNAL-IP view and mirror the voltgrid.com entries in
+# group_vars/all/main.yml `global_dns_records` -- keep the two in sync. is-inet
+# (the simulated internet) stub-delegates voltgrid.com here via the WAN NAT, so
+# these are the answers the "internet" actually gets.
+dmz_public_zone: "voltgrid.com"
+
+# A records. "@" is the zone apex. www/billing ride the external-fw WAN
+# (75.21.1.1 -> DNAT to pp-www); apex + mail are the webmail IP; ns1 is this
+# server's public identity (reached via the WAN :53 NAT).
+dmz_public_a_records:
+  - name: "@"
+    value: "52.96.223.2"
+  - name: "www"
+    value: "75.21.1.1"
+  - name: "billing"
+    value: "75.21.1.1"
+  - name: "mail"
+    value: "52.96.223.2"
+  - name: "ns1"
+    value: "75.21.1.1"
+
+dmz_public_mx:
+  - priority: 10
+    value: "mail.voltgrid.com"
+
+# The zone's advertised nameserver.
+dmz_public_ns: "ns1.voltgrid.com"

@@ -245,6 +245,11 @@
   register: pfsense_natfw
   changed_when: "'CHANGED' in pfsense_natfw.stdout"
   when: pfsense_nat_rules is defined and (pfsense_nat_rules | length) > 0
+  # Also tagged public_dns so the voltgrid.com public-DNS feature deploys with a
+  # single `--tags public_dns` run (the WAN :53 DNAT to pp-dmz-dns lives in
+  # pp-external-firewall's pfsense_nat_rules). Idempotent on the other firewalls.
+  tags:
+    - public_dns
 
 # Lab-mode firewall: permit any-any on each named interface. Tighten by
 # overriding `pfsense_rules` in host_vars later if you want per-rule control.

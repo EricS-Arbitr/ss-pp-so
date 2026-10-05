@@ -1131,6 +1131,79 @@
   tags:
     - global_dns
 
+# pp-dmz-dns — the PUBLIC authoritative nameserver for voltgrid.com. Stands up
+# Windows DNS with a file-backed voltgrid.com zone holding the external-IP view
+# (www/billing -> WAN, apex/mail -> webmail). is-inet stub-delegates voltgrid.com
+# here (see the is-inet delegation below) and pp-external-firewall DNATs WAN :53
+# to this box. Split-horizon: the corp/internal view stays on the AD DCs.
+- name: public DNS — pp-dmz-dns authoritative zone for voltgrid.com
+  hosts: pp-dmz-dns
+  gather_facts: false
+  roles:
+    - dmz_public_dns
+  tags:
+    - public_dns
+
+# is-inet (the simulated internet) now DELEGATES voltgrid.com to pp-dmz-dns
+# instead of answering it from local-data, matching the image's own site.com
+# forward-zone pattern. Two steps: re-render unbound's local-data WITHOUT
+# voltgrid.com (so it falls through), then add a top-level forward-zone for
+# voltgrid.com -> the external-fw WAN (which DNATs :53 to pp-dmz-dns).
+- name: public DNS — delegate voltgrid.com from is-inet to pp-dmz-dns
+  hosts: is-inet
+  gather_facts: true
+  become: true
+  vars:
+    public_dns_wan_ip: "75.21.1.1"   # pp-external-firewall WAN; DNATs :53 → pp-dmz-dns
+  tags:
+    - public_dns
+  tasks:
+    - name: Re-render is-inet unbound local-data (voltgrid.com now delegated)
+      ansible.builtin.include_role:
+        name: global_dns
+        apply:
+          tags: [public_dns]
+      tags: [public_dns]
+
+    # Top-level forward-zone appended to the container's unbound.conf, the same
+    # way the image ships site.com. Idempotent via the marker comment; prints
+    # ADDED only when it actually writes.
+    - name: Delegate voltgrid.com — add the forward-zone if absent
+      community.docker.docker_container_exec:
+        container: "{{ global_dns_container_name }}"
+        argv:
+          - sh
+          - -c
+          - >-
+            grep -q "public_dns voltgrid.com" /etc/unbound/unbound.conf && echo PRESENT ||
+            { printf '%s\n' '' '# public_dns voltgrid.com -> pp-dmz-dns (via WAN {{ public_dns_wan_ip }})' 'forward-zone:' '  name: "voltgrid.com"' '  forward-addr: {{ public_dns_wan_ip }}' >> /etc/unbound/unbound.conf && echo ADDED; }
+      register: isinet_fz
+      changed_when: "'ADDED' in (isinet_fz.stdout | default(''))"
+
+    - name: Validate unbound config in the container (tolerate no checkconf binary)
+      community.docker.docker_container_exec:
+        container: "{{ global_dns_container_name }}"
+        argv:
+          - sh
+          - -c
+          - command -v unbound-checkconf >/dev/null 2>&1 && unbound-checkconf || echo SKIP_NO_CHECKCONF
+      register: isinet_checkconf
+      changed_when: false
+      failed_when: isinet_checkconf.rc != 0 and 'SKIP_NO_CHECKCONF' not in (isinet_checkconf.stdout | default(''))
+
+    - name: Reload unbound so the delegation takes effect
+      community.docker.docker_container_exec:
+        container: "{{ global_dns_container_name }}"
+        argv: [ unbound-control, reload ]
+      changed_when: true
+
+    - name: Report the delegation state
+      ansible.builtin.debug:
+        msg: >-
+          voltgrid.com delegated to {{ public_dns_wan_ip }} → pp-dmz-dns:
+          forward-zone {{ 'added' if (isinet_fz.stdout is defined and 'ADDED' in isinet_fz.stdout) else 'already present' }},
+          unbound {{ 'checkconf OK' if ('SKIP_NO_CHECKCONF' not in (isinet_checkconf.stdout | default(''))) else 'reloaded (no checkconf binary)' }}
+
 # is-inet's Postfix + Dovecot + webmail stack. Deployed as a docker-compose
 # service under /opt/email/ by the customer `email` role from
 # range-development-ansible. Multi-domain: driven by `email_domains` in

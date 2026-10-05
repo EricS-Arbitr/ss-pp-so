@@ -146,3 +146,20 @@ pfsense_nat_rules:
     target: "172.16.8.5"
     local_port: 443
     associated_rule: "pass"
+  # Public DNS for voltgrid.com -> pp-dmz-dns (172.16.8.4). is-inet stub-
+  # delegates voltgrid.com to the WAN IP, which DNATs here. DNS needs BOTH
+  # udp (normal queries) and tcp (truncated/zone-transfer-sized answers).
+  - descr: "DNS udp → pp-dmz-dns (voltgrid.com public authority)"
+    interface_descr: "WAN_ISP"
+    protocol: "udp"
+    destination_port: 53
+    target: "172.16.8.4"
+    local_port: 53
+    associated_rule: "pass"
+  - descr: "DNS tcp → pp-dmz-dns (voltgrid.com public authority)"
+    interface_descr: "WAN_ISP"
+    protocol: "tcp"
+    destination_port: 53
+    target: "172.16.8.4"
+    local_port: 53
+    associated_rule: "pass"

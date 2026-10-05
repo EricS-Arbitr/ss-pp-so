@@ -1,0 +1,94 @@
+---
+# See defaults/main.yml for what this is and why the zone is file-backed.
+
+- name: Install the DNS Server role (with management tools)
+  ansible.windows.win_feature:
+    name: DNS
+    include_management_tools: true
+  register: dmz_dns_feature
+
+- name: Reboot if installing the DNS role asked for it
+  ansible.windows.win_reboot:
+  when: dmz_dns_feature.reboot_required | default(false)
+
+# File-backed primary zone — this box is not a DC, so AD replication scopes do
+# not apply. Idempotent: created only if absent.
+- name: Ensure the file-backed public primary zone exists for {{ dmz_public_zone }}
+  ansible.windows.win_powershell:
+    script: |
+      $ErrorActionPreference = 'Stop'
+      $zone = '{{ dmz_public_zone }}'
+      if (-not (Get-DnsServerZone -Name $zone -ErrorAction SilentlyContinue)) {
+        Add-DnsServerPrimaryZone -Name $zone -ZoneFile "$zone.dns" -DynamicUpdate None
+        $Ansible.Changed = $true
+      }
+      Write-Output ("ZONE " + (Get-DnsServerZone -Name $zone).ZoneName)
+  register: dmz_zone
+
+# Reconcile every managed record to its intended value. For each, if a record
+# of that name/type already holds the right data it is left alone; otherwise the
+# old one is removed and the correct one added, so a value change propagates.
+- name: Reconcile the public records for {{ dmz_public_zone }}
+  ansible.windows.win_powershell:
+    script: |
+      $ErrorActionPreference = 'Stop'
+      $zone = '{{ dmz_public_zone }}'
+      $changed = $false
+
+      # $zone is read from the enclosing script scope (NOT $using:, which is
+      # only valid in Invoke-Command / Start-Job scriptblocks).
+      function Set-A($name, $ip) {
+        $cur  = Get-DnsServerResourceRecord -ZoneName $zone -Name $name -RRType A -ErrorAction SilentlyContinue
+        $have = @($cur | ForEach-Object { $_.RecordData.IPv4Address.IPAddressToString })
+        if ($have.Count -eq 1 -and $have[0] -eq $ip) { return $false }
+        if ($cur) { $cur | Remove-DnsServerResourceRecord -ZoneName $zone -Force }
+        Add-DnsServerResourceRecordA -ZoneName $zone -Name $name -IPv4Address $ip
+        return $true
+      }
+
+      {% for r in dmz_public_a_records %}
+      if (Set-A '{{ r.name }}' '{{ r.value }}') { $changed = $true }
+      {% endfor %}
+
+      # MX at the apex — reconcile to exactly the intended set.
+      $wantMx = @(
+      {% for m in dmz_public_mx %}
+        @{ pref = {{ m.priority }}; ex = '{{ m.value }}.' }{{ "," if not loop.last else "" }}
+      {% endfor %}
+      )
+      $curMx = @(Get-DnsServerResourceRecord -ZoneName $zone -RRType Mx -ErrorAction SilentlyContinue)
+      $haveOk = $false
+      if ($curMx.Count -eq $wantMx.Count -and $curMx.Count -gt 0) {
+        $haveOk = $true
+        foreach ($w in $wantMx) {
+          if (-not ($curMx | Where-Object { $_.RecordData.Preference -eq $w.pref -and $_.RecordData.MailExchange -eq $w.ex })) { $haveOk = $false }
+        }
+      }
+      if (-not $haveOk) {
+        if ($curMx.Count -gt 0) { $curMx | Remove-DnsServerResourceRecord -ZoneName $zone -Force }
+        foreach ($w in $wantMx) {
+          Add-DnsServerResourceRecordMX -ZoneName $zone -Name '@' -Preference $w.pref -MailExchange $w.ex.TrimEnd('.')
+        }
+        $changed = $true
+      }
+
+      # Zone NS at apex -> ns1.voltgrid.com (advertise this server as authority).
+      $ns = '{{ dmz_public_ns }}.'
+      if (-not (Get-DnsServerResourceRecord -ZoneName $zone -RRType NS -ErrorAction SilentlyContinue |
+                Where-Object { $_.RecordData.NameServer -eq $ns })) {
+        Add-DnsServerResourceRecordNS -ZoneName $zone -Name '@' -NameServer $ns.TrimEnd('.')
+        $changed = $true
+      }
+
+      if ($changed) { $Ansible.Changed = $true }
+      $rr = Get-DnsServerResourceRecord -ZoneName $zone
+      Write-Output ("RECORDS A=" + @($rr | Where-Object {$_.RecordType -eq 'A'}).Count +
+                    " MX=" + @($rr | Where-Object {$_.RecordType -eq 'MX'}).Count +
+                    " NS=" + @($rr | Where-Object {$_.RecordType -eq 'NS'}).Count)
+  register: dmz_records
+
+- name: Report the public zone state
+  ansible.builtin.debug:
+    msg: >-
+      {{ (dmz_zone.output | default(['(no zone)']) | join(' ')) }} |
+      {{ (dmz_records.output | default(['(no records)']) | join(' ')) }}
