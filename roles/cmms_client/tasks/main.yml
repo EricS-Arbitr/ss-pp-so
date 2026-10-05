@@ -1,0 +1,53 @@
+---
+# =========================================================================
+# Voltgrid CMMS client config on the engineering workstations
+# =========================================================================
+# Plants the discoverable connection string. See defaults/main.yml for what
+# this is and why the credential is plaintext on the host. Nothing here needs
+# the database to be up or DNS to resolve — the file is static text a player
+# reads later; resolution and authentication happen when the string is USED,
+# not when it is dropped. Safe to run any time the workstations are online.
+
+- name: Ensure the CMMS client install directory exists
+  ansible.windows.win_file:
+    path: "{{ cmms_client_install_dir }}"
+    state: directory
+
+# A benign second file so the folder reads like an install, not a lone config.
+# No secret here — this is exactly what a real release drop would carry.
+- name: Drop the CMMS client release notes
+  ansible.windows.win_copy:
+    dest: "{{ cmms_client_install_dir }}\\Release Notes.txt"
+    content: |
+      Voltgrid Power — CMMS Client {{ cmms_client_app_version }}
+
+      Maintenance and work-order client for the plant CMMS.
+      Connects to VoltgridCMMS on {{ cmms_client_sql_host }}.
+
+      {{ cmms_client_app_version }}
+        - Outage-window calendar view
+        - Bulk work-order export
+      Support: helpdesk@{{ domain_name }}
+
+- name: Drop the CMMS client configuration with the connection string
+  ansible.windows.win_template:
+    src: Voltgrid.CMMS.Client.exe.config.j2
+    dest: "{{ cmms_client_install_dir }}\\Voltgrid.CMMS.Client.exe.config"
+  no_log: true
+
+- name: Confirm the client config is in place
+  ansible.windows.win_stat:
+    path: "{{ cmms_client_install_dir }}\\Voltgrid.CMMS.Client.exe.config"
+  register: cmms_client_cfg
+
+- name: Report the planted client config
+  ansible.builtin.debug:
+    msg: >-
+      CMMS client config on {{ inventory_hostname }}:
+      {{ 'present' if cmms_client_cfg.stat.exists else 'MISSING' }}
+      at {{ cmms_client_install_dir }}\Voltgrid.CMMS.Client.exe.config
+
+- name: Fail if the client config was not written
+  ansible.builtin.fail:
+    msg: "CMMS client config missing on {{ inventory_hostname }} after templating."
+  when: not cmms_client_cfg.stat.exists

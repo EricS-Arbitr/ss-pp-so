@@ -107,6 +107,22 @@ check_pf_shell() {
   fi
 }
 
+# Same as check_pf_shell but becomes root (-b). so-elasticsearch-query on the SO
+# manager must run as root -- as the login user it prints nothing and every data
+# check read NONE on an otherwise-healthy grid (56 agents, Zeek/Sysmon/Defend all
+# populated, confirmed by hand with `ansible so-manager -b`). The pfSense/syslog
+# checks above don't need root, so only the Security Onion data checks use this.
+check_so_shell() {
+  local host="$1" cmd="$2" expect="$3" label="$4"
+  local out
+  out=$(A "$host" -b -m ansible.builtin.shell -a "$cmd" --one-line)
+  if echo "$out" | grep -qE "$expect"; then
+    pass "$label"
+  else
+    fail "$label" "$out"
+  fi
+}
+
 count_ps_predicate() {
   local group="$1" ps="$2" expect="$3"
   A "$group" -m ansible.windows.win_shell -a "$ps" --one-line \
@@ -253,11 +269,14 @@ check_pf_shell pp-external-firewall \
 # =========================================================================
 section "4. Active Directory — voltgrid.com"
 
-# simspace in Domain Admins on the forest root.
+# xadmin in Domain Admins on the forest root. The domain admin was renamed from
+# simspace to xadmin when every Windows image moved to 1.2.x (the 1.2.x local
+# admin and the domain admin share one identity), matching the released
+# range-development-ansible convention.
 check_ps pp-dc01 \
-  'Get-ADGroupMember "Domain Admins" | Where-Object { $_.Name -eq "simspace" } | Select-Object -ExpandProperty Name' \
-  '\(stdout\)[[:space:]]+simspace' \
-  "voltgrid.com: simspace is in Domain Admins"
+  'Get-ADGroupMember "Domain Admins" | Where-Object { $_.Name -eq "xadmin" } | Select-Object -ExpandProperty Name' \
+  '\(stdout\)[[:space:]]+xadmin' \
+  "voltgrid.com: xadmin is in Domain Admins"
 
 # DomainUsers population — floor at 20 to catch a partial create_users run.
 check_ps pp-dc01 \
@@ -396,29 +415,29 @@ done
 # backing-index rollover splitting the answer across rows.
 section "7. SOC tier — Security Onion data arrival"
 
-check_pf_shell so-manager \
+check_so_shell so-manager \
   'n=$(so-elasticsearch-query "logs-windows.sysmon_operational-default/_count" 2>/dev/null | grep -o "\"count\":[0-9]*" | cut -d: -f2); [ -n "$n" ] && [ "$n" -gt 0 ] && echo OK_$n || echo NONE' \
   'OK_' \
   "SO: Sysmon events arriving (logs-windows.sysmon_operational)"
 
-check_pf_shell so-manager \
+check_so_shell so-manager \
   'n=$(so-elasticsearch-query "logs-endpoint.events.process-default/_count" 2>/dev/null | grep -o "\"count\":[0-9]*" | cut -d: -f2); [ -n "$n" ] && [ "$n" -gt 0 ] && echo OK_$n || echo NONE' \
   'OK_' \
   "SO: Elastic Defend process events arriving (logs-endpoint.events.process)"
 
-check_pf_shell so-manager \
+check_so_shell so-manager \
   'n=$(so-elasticsearch-query "logs-system.syslog-default/_count" 2>/dev/null | grep -o "\"count\":[0-9]*" | cut -d: -f2); [ -n "$n" ] && [ "$n" -gt 0 ] && echo OK_$n || echo NONE' \
   'OK_' \
   "SO: Linux syslog arriving (logs-system.syslog)"
 
-check_pf_shell so-manager \
+check_so_shell so-manager \
   'n=$(so-elasticsearch-query "logs-zeek-so/_count" 2>/dev/null | grep -o "\"count\":[0-9]*" | cut -d: -f2); [ -n "$n" ] && [ "$n" -gt 0 ] && echo OK_$n || echo NONE' \
   'OK_' \
   "SO: Zeek network metadata arriving (logs-zeek-so)"
 
 # Fleet enrollment count. Complements the per-host assertion in
 # 75-endpoint.yml -- this catches a grid that lost agents between deploys.
-check_pf_shell so-manager \
+check_so_shell so-manager \
   'n=$(so-elasticsearch-query ".fleet-agents/_count" 2>/dev/null | grep -o "\"count\":[0-9]*" | cut -d: -f2); [ -n "$n" ] && [ "$n" -ge 40 ] && echo OK_$n || echo LOW_${n:-0}' \
   'OK_' \
   "SO: >= 40 Elastic Agents enrolled in Fleet"

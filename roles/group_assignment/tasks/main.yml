@@ -18,10 +18,22 @@
 #
 # The play wrapper is dropped — the Create Users play already targets pdc and
 # already includes this role.
+# microsoft.ad.user, NOT community.windows.win_domain_user. That module was
+# REMOVED in community.windows 3.0.0 — on a controller carrying 3.x this task
+# is a hard error, and on the pre-3.0.0 controller this range runs today it
+# only prints a deprecation. ansible-lint flagged it 2026-09-29, and while it
+# stood the whole of 00-baseline.yml failed syntax-check, so lint could not
+# validate ANY of this playbook.
+#
+# The semantics map one-to-one: win_domain_user defaulted to
+# groups_action: replace, and `groups: set:` is the same operation. `identity`
+# rather than `name` so this only ever UPDATES — create_users runs immediately
+# before it in the same play and owns creation.
 - name: Group Assignment
-  community.windows.win_domain_user:
-    name: "{{ item.name }}"
-    groups: "{{ item.groups }}"
+  microsoft.ad.user:
+    identity: "{{ item.name }}"
+    groups:
+      set: "{{ item.groups }}"
     state: present
   loop: "{{ DomainUsers }}"
   loop_control:

@@ -1,0 +1,30 @@
+;   SQL Server 2022 unattended install for the Voltgrid CMMS.
+;   Engine only: no SSAS, SSIS, SSRS or full-text. The scenario needs a
+;   relational store and a listener, and every extra feature is install time
+;   and attack surface that earns nothing.
+[OPTIONS]
+ACTION="Install"
+FEATURES=SQLENGINE
+QUIET="True"
+INSTANCENAME="{{ cmms_instance }}"
+INSTANCEID="{{ cmms_instance }}"
+IACCEPTSQLSERVERLICENSETERMS="True"
+UPDATEENABLED="False"
+; WINDOWS AUTH ONLY AT INSTALL TIME, DELIBERATELY.
+; SECURITYMODE="SQL" obliges setup to take /SAPWD, and setup serialises that
+; into its settings XML through SqlSecureString, which encrypts it with DPAPI.
+; Over WinRM there is no loaded user profile, DPAPI returns 0x80070005, and
+; setup dies with "There was an error generating the XML document" before it
+; installs anything. Measured on pp-sql 2026-09-29.
+;
+; Mixed mode is enabled after the install by setting LoginMode, which needs no
+; password on a command line and no DPAPI. `sa` stays disabled: this range never
+; uses it, and the login the scenario cares about is svc_cmms.
+SQLSYSADMINACCOUNTS="BUILTIN\Administrators"
+SQLSVCACCOUNT="NT Service\MSSQLSERVER"
+SQLSVCSTARTUPTYPE="Automatic"
+AGTSVCACCOUNT="NT AUTHORITY\NETWORK SERVICE"
+AGTSVCSTARTUPTYPE="Disabled"
+BROWSERSVCSTARTUPTYPE="Disabled"
+TCPENABLED="1"
+NPENABLED="0"

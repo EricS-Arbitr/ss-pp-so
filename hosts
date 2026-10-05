@@ -77,6 +77,11 @@ pp-syslog
 
 # OT-side servers — on the 192.168.100.0/24 OT subnet behind pp-ot-router.
 # Domain-joined; auth/DNS goes to pp-dc03 (local OT DC) with pp-dc01 fallback.
+# Maintenance system of record. pp-sql carried the name with no database
+# until 2026-09-29 (ACTION_PLAN B5); roles/cmms makes it real.
+[cmms]
+pp-sql
+
 [ot_servers]
 pp-dcs-ctrl
 

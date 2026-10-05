@@ -1,41 +1,44 @@
 ansible_connection: winrm
 ansible_winrm_transport: ntlm
 ansible_port: 5985
-# SERVERS ONLY in practice. [win10] and [win11] override ansible_user,
-# ansible_password and ansible_become_user for the 36 workstations -- see
-# group_vars/win10.yml. ansible_become_user must always track ansible_user:
-# `runas` has no separate become password, so a mismatch authenticates the
-# connection and then fails the privilege escalation.
-# simspace, because this group is the LEGACY DEFAULT and the refreshed images
-# override it. Which account a Windows host wants is decided by its IMAGE
-# VERSION, not by whether it is a server:
+# ONE account for every Windows host, as of the 0.1.43 blueprint (2026-10-02):
+# all Windows images are now 1.2.x and ship `xadmin`. Which account a Windows
+# host wants is decided by its IMAGE VERSION, and every image refreshed past it:
 #
-#   RDP_Windows_10 / _11          1.2.4   refreshed -> xadmin  (win10/win11.yml)
-#   RDP_Windows_Server_2022       1.2.5   refreshed -> xadmin  (winserver2022.yml)
-#   RDP_Windows_Server_2019       1.1.0   NOT refreshed -> simspace  (here)
-#   RDP_Ubuntu_Desktop_22.04.5    1.1.0   NOT refreshed -> simspace  (linux.yml)
+#   RDP_Windows_10 / _11          1.2.4   -> xadmin
+#   RDP_Windows_Server_2022       1.2.5   -> xadmin
+#   RDP_Windows_Server_2019       1.2.5   -> xadmin  (refreshed from 1.1.0/simspace)
+#   RDP_Ubuntu_Desktop_22.04.5    1.1.0   -> simspace (Linux, group_vars/linux.yml)
 #
-# 1.2.x shipped xadmin; 1.1.0 did not. Confirmed on 2026-09-25 by the failure
-# pattern: all 36 workstations (1.2.4) connected fine while all nine servers
-# failed, and the range team had already confirmed 22.04.5 (1.1.0) is "still
-# behind as simspace".
+# This used to carry `simspace` because the 2019 servers were still 1.1.0, with
+# win10.yml / win11.yml / winserver2022.yml overriding it to xadmin for the
+# refreshed images. The 2019 refresh removed the last simspace holdout, so those
+# three overrides were deleted and xadmin moved here -- exactly as the
+# winserver2022.yml comment said to do when 2019 was refreshed. Every 1.2.x
+# image shares one secret: vault_windows_xadmin_password.
 #
-# This group was briefly set to xadmin on 2026-09-24, which broke BOTH server
-# tiers at once -- the 2019 hosts because they have no xadmin, and the 2022
-# hosts because the vault still held the simspace-era password.
-ansible_user: simspace
-ansible_password: "{{ vault_windows_password }}"
+# There is deliberately NO `| default(...)` on the password. An undefined vault
+# variable fails loudly on the first task; a defaulted one supplies a wrong
+# password, and roles/init's wait_for_connection retries a rejected credential
+# for the full timeout with no per-host output -- indistinguishable from a host
+# that never booted, and it takes all 45 Windows hosts down with it.
+ansible_user: xadmin
+ansible_password: "{{ vault_windows_xadmin_password }}"
 ansible_python_interpreter: python
 ansible_become_method: runas
 # Tracks ansible_user: `runas` has no separate become password, so a mismatch
 # authenticates the connection and then fails the privilege escalation.
-ansible_become_user: simspace
+ansible_become_user: xadmin
 staging_dir_windows: "C:\\temp"
 
 # Common installers
 chrome_installer: "https://nexus.dev.ng.simspace.lan/repository/ng_raw/installers/Google/Chrome/113.0.5672.93/googlechromestandaloneenterprise64.msi"
 firefox_installer: "https://nexus.dev.ng.simspace.lan/repository/ng_raw/installers/Firefox/136.0.1/firefox_setup_136.0.1.msi"
 sysmon_installer: "https://nexus.dev.ng.simspace.lan/repository/ng_raw/installers/Microsoft/sysmon/sysmon64.exe"
+
+# SQL Server 2022 media for the CMMS on pp-sql. Zero egress: this is the
+# in-platform Nexus, the same source as every other installer here.
+sql_server_installer: "https://nexus.dev.ng.simspace.lan/repository/ng_raw/installers/Microsoft/SQL/SQLServer2022.zip"
 
 # Range agent bootstrap (referenced by common role on every Windows host)
 range_agent_bootstrap: range-agent-bootstrap-x64.msi

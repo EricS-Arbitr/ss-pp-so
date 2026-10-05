@@ -1,0 +1,196 @@
+/* =====================================================================
+   Voltgrid Power CMMS — reference data and generated work-order history.
+
+   Reference rows (assets, technicians, vendors, parts, PMs, outages) are
+   CURATED. A plant's asset register is the one table where generated names
+   read as obviously fake, and the register is what makes this a credible
+   target rather than a table of noise.
+
+   The OT rows carry their REAL addresses on this range. That correlation is
+   deliberate: the lesson of this database is that a maintenance system on
+   the IT segment tells you exactly which host on the OT segment to reach
+   for, and how important it is.
+
+   Work orders are generated with RAND(<fixed seed>) so a rebuild produces
+   byte-identical data -- the same reproducibility convention billing_site
+   uses with random.Random(42).
+   ===================================================================== */
+USE [{{ cmms_db_name }}];
+GO
+
+/* ---------- vendors ---------- */
+INSERT INTO dbo.vendors (name, contact, email, phone, contract_no, service_level) VALUES
+ ('Hargrove Turbine Services','R. Hargrove','service@hargroveturbine.example','+1-555-0142','VG-2024-TS-01','24x7 4hr'),
+ ('Cascade Rotating Equipment','M. Ilic','support@cascade-rotating.example','+1-555-0177','VG-2024-RE-04','Next business day'),
+ ('Northline Electrical','D. Okafor','dispatch@northline-elec.example','+1-555-0119','VG-2023-EL-11','24x7 2hr'),
+ ('Pentworth Controls','A. Behrens','helpdesk@pentworth.example','+1-555-0166','VG-2025-CT-02','8x5'),
+ ('Ridgeway Valve & Fitting','S. Kaur','orders@ridgewayvalve.example','+1-555-0133','VG-2024-VF-07','Stock order'),
+ ('Delta Instrument Calibration','J. Moreau','cal@deltainstrument.example','+1-555-0188','VG-2025-IC-03','Quarterly on site');
+GO
+
+/* ---------- technicians ---------- */
+INSERT INTO dbo.technicians (badge, full_name, craft, shift, email, phone, certification) VALUES
+ ('VG-1042','Darren Whitfield','Mechanical','Days','darren.whitfield@voltgrid.com','+1-555-0201','Millwright Level III'),
+ ('VG-1088','Priya Raghunathan','I&C','Days','priya.raghunathan@voltgrid.com','+1-555-0202','ISA CCST II'),
+ ('VG-1103','Marcus Boyle','Electrical','Nights','marcus.boyle@voltgrid.com','+1-555-0203','Journeyman Electrician'),
+ ('VG-1117','Elena Vasquez','I&C','Swing','elena.vasquez@voltgrid.com','+1-555-0204','ISA CCST III'),
+ ('VG-1125','Tomasz Zielinski','Mechanical','Nights','tomasz.zielinski@voltgrid.com','+1-555-0205','Vibration Analyst Cat II'),
+ ('VG-1140','Renee Okonjo','Operations','Days','renee.okonjo@voltgrid.com','+1-555-0206','Control Room Operator'),
+ ('VG-1158','Callum Wright','Electrical','Days','callum.wright@voltgrid.com','+1-555-0207','HV Switching Authorised'),
+ ('VG-1163','Sofia Marchetti','I&C','Days','sofia.marchetti@voltgrid.com','+1-555-0208','Fisher Valve Certified'),
+ ('VG-1171','Andre Dubois','Mechanical','Swing','andre.dubois@voltgrid.com','+1-555-0209','Welder 6G'),
+ ('VG-1186','Hana Kobayashi','Reliability','Days','hana.kobayashi@voltgrid.com','+1-555-0210','CMRP'),
+ ('VG-1194','Gregor Lindqvist','Electrical','Nights','gregor.lindqvist@voltgrid.com','+1-555-0211','Relay Technician'),
+ ('VG-1207','Bianca Ferreira','Operations','Nights','bianca.ferreira@voltgrid.com','+1-555-0212','Control Room Operator');
+GO
+
+/* ---------- assets ----------
+   Rows with ip_address are REAL hosts on this range. */
+INSERT INTO dbo.assets (tag, name, asset_type, area, criticality, manufacturer, model, serial_no, installed_on, ip_address, notes) VALUES
+ ('GT-01','Gas Turbine Unit 1','Turbine','Power Block',1,'Siemens','SGT-800','SGT800-4471','2019-04-18',NULL,'Primary generating unit. Trips on HP fuel gas low-low.'),
+ ('GT-02','Gas Turbine Unit 2','Turbine','Power Block',1,'Siemens','SGT-800','SGT800-4472','2019-06-02',NULL,'Primary generating unit.'),
+ ('ST-01','Steam Turbine','Turbine','Power Block',1,'Siemens','SST-400','SST400-1182','2019-08-27',NULL,'Combined-cycle steam tail.'),
+ ('HRSG-01','Heat Recovery Steam Generator 1','Boiler','Power Block',1,'Nooter/Eriksen','NE-2P-180','NE180-0221','2019-05-11',NULL,'Two-pressure, unfired.'),
+ ('HRSG-02','Heat Recovery Steam Generator 2','Boiler','Power Block',1,'Nooter/Eriksen','NE-2P-180','NE180-0222','2019-07-03',NULL,NULL),
+ ('GEN-01','Generator Unit 1','Generator','Power Block',1,'Brush','DAX 63-193','BR63-8801','2019-04-18',NULL,'Hydrogen cooled.'),
+ ('GEN-02','Generator Unit 2','Generator','Power Block',1,'Brush','DAX 63-193','BR63-8802','2019-06-02',NULL,NULL),
+ ('XFMR-01','Main Step-Up Transformer 1','Transformer','Switchyard',1,'ABB','TrafoStar 120MVA','ABB-120-3341','2019-03-30',NULL,'DGA sampled quarterly.'),
+ ('XFMR-02','Main Step-Up Transformer 2','Transformer','Switchyard',1,'ABB','TrafoStar 120MVA','ABB-120-3342','2019-03-30',NULL,NULL),
+ ('BKR-345-01','345kV Line Breaker','Breaker','Switchyard',1,'Siemens','3AP1 FG','SIE3AP-7712','2019-02-14',NULL,'SF6. Interrupter count tracked.'),
+ ('SWGR-4160-01','4.16kV Station Switchgear','Switchgear','Power Block',2,'Eaton','VacClad-W','EAT-VCW-5520','2019-03-08',NULL,NULL),
+ ('FGC-01','Fuel Gas Compressor A','Compressor','Fuel Yard',2,'Ariel','JGJ/4','ARL-JGJ-9014','2019-05-22',NULL,'Lead/lag with FGC-02.'),
+ ('FGC-02','Fuel Gas Compressor B','Compressor','Fuel Yard',2,'Ariel','JGJ/4','ARL-JGJ-9015','2019-05-22',NULL,NULL),
+ ('BFP-01','Boiler Feedwater Pump A','Pump','Power Block',2,'Flowserve','WDX 8-stage','FLS-WDX-2208','2019-06-14',NULL,NULL),
+ ('BFP-02','Boiler Feedwater Pump B','Pump','Power Block',2,'Flowserve','WDX 8-stage','FLS-WDX-2209','2019-06-14',NULL,NULL),
+ ('CWP-01','Circulating Water Pump A','Pump','Cooling',3,'Sulzer','SJT 42','SLZ-SJT-6610','2019-07-19',NULL,NULL),
+ ('CWP-02','Circulating Water Pump B','Pump','Cooling',3,'Sulzer','SJT 42','SLZ-SJT-6611','2019-07-19',NULL,NULL),
+ ('CT-01','Cooling Tower Cells 1-6','Cooling Tower','Cooling',3,'SPX','NC8409','SPX-NC-4402','2019-07-30',NULL,'Fan gearbox oil changed annually.'),
+ ('UPS-01','Station UPS','UPS','Power Block',2,'Eaton','93PM 80kVA','EAT-93PM-1180','2019-03-02',NULL,'Battery string replaced 2024.'),
+ ('BATT-01','125VDC Station Battery','Battery','Power Block',2,'EnerSys','DDm-100','ENS-DDM-7731','2019-03-02',NULL,'Quarterly impedance test.'),
+ /* --- control and monitoring systems: real hosts on this range --- */
+ ('DCS-01','Distributed Control System Controller','DCS','Control Room',1,'Emerson','Ovation OCR3000','EMR-OCR-1010','2019-02-20','192.168.100.10','Primary plant control. Engineering workstation access via OT-Ctrl segment.'),
+ ('PLC-GAS-01','Gas Plant Safety PLC','PLC','Fuel Yard',1,'Allen-Bradley','ControlLogix 1756-L83E','AB-L83-2201','2019-04-05','192.168.95.2','Burner management and ESD logic. Keyswitch normally in RUN.'),
+ ('VIB-MON-01','Turbine Vibration Monitoring','Analyser','Power Block',2,'Bently Nevada','3500/42M','BN3500-8890','2019-04-18','192.168.90.101','Feeds trip logic to DCS-01 and history to HIST-01.'),
+ ('HIST-01','Process Historian','Historian','OT Services',2,'AVEVA','Historian 2023','AVV-HIST-3312','2019-09-01','192.168.90.107','Retains 2 years of tag history. Replicates to business network read-only.'),
+ ('GASSIM-01','Gas Turbine Process Simulator','Simulator','Fuel Yard',4,'Pentworth','PTS-Sim 4','PW-SIM-0440','2021-11-12','192.168.90.8','Training and testing only. Not tied to live control.');
+GO
+
+/* ---------- parts ---------- */
+INSERT INTO dbo.parts (part_no, description, qty_on_hand, reorder_point, bin, unit_cost, vendor_id) VALUES
+ ('FLT-GT-0142','GT inlet air filter element',48,24,'A-12-3',186.40,1),
+ ('SEAL-BFP-221','BFP mechanical seal cartridge',4,2,'B-04-1',3420.00,2),
+ ('BRG-CWP-118','CWP thrust bearing',2,1,'B-06-2',5870.00,2),
+ ('VLV-FG-0093','Fuel gas control valve trim kit',3,2,'C-01-4',2140.00,5),
+ ('RLY-SEL-351','SEL-351 protective relay (spare)',2,1,'E-02-1',4980.00,3),
+ ('CB-SF6-0021','SF6 gas cylinder 40kg',6,3,'Y-01-1',740.00,3),
+ ('LUB-TURB-32','Turbine lube oil ISO VG32 (208L)',12,6,'D-09-2',1180.00,2),
+ ('FLT-LUB-0771','Lube oil filter element',36,18,'A-14-1',92.75,2),
+ ('GSKT-HRSG-44','HRSG manway gasket set',8,4,'C-03-2',410.00,5),
+ ('THRM-K-0210','Type K thermocouple probe',24,12,'F-01-3',118.00,6),
+ ('XMTR-PT-0455','Pressure transmitter 0-1500 psig',6,3,'F-02-1',1340.00,6),
+ ('IOCARD-AB-16','1756-IF16 analog input card',4,2,'F-05-1',2260.00,4),
+ ('IOCARD-AB-OB','1756-OB16E output card',4,2,'F-05-2',1890.00,4),
+ ('BATT-CELL-125','125VDC battery cell',8,4,'E-07-1',620.00,3),
+ ('FAN-CT-0088','Cooling tower fan gearbox oil (19L)',10,5,'D-11-1',265.00,2),
+ ('BELT-FGC-31','FGC drive belt set',6,3,'B-08-3',540.00,2),
+ ('ORING-VLV-12','Valve o-ring kit assorted',40,20,'C-02-1',48.90,5),
+ ('CAL-GAS-0100','Calibration gas 100ppm CH4',4,2,'F-09-1',380.00,6),
+ ('HEPA-CR-004','Control room HVAC filter',16,8,'A-01-1',76.50,1),
+ ('FUSE-4160-08','4.16kV current limiting fuse',12,6,'E-03-2',310.00,3);
+GO
+
+/* ---------- preventive-maintenance schedules ---------- */
+INSERT INTO dbo.pm_schedules (asset_id, task, interval_days, last_done, next_due, est_hours)
+SELECT a.asset_id, v.task, v.days,
+       DATEADD(day, -v.offset, CAST(GETDATE() AS DATE)),
+       DATEADD(day, v.days - v.offset, CAST(GETDATE() AS DATE)), v.hrs
+FROM dbo.assets a
+JOIN (VALUES
+ ('GT-01','Borescope inspection — combustion section',365,120,24.0),
+ ('GT-01','Inlet filter differential check',30,11,1.5),
+ ('GT-02','Borescope inspection — combustion section',365,240,24.0),
+ ('ST-01','Governor valve stroke test',180,54,6.0),
+ ('HRSG-01','Drum level transmitter calibration',180,73,4.0),
+ ('HRSG-02','Drum level transmitter calibration',180,101,4.0),
+ ('GEN-01','Hydrogen purity and dewpoint check',30,6,2.0),
+ ('GEN-02','Hydrogen purity and dewpoint check',30,19,2.0),
+ ('XFMR-01','Dissolved gas analysis sample',90,31,2.5),
+ ('XFMR-02','Dissolved gas analysis sample',90,58,2.5),
+ ('BKR-345-01','SF6 density and interrupter count',180,88,3.0),
+ ('SWGR-4160-01','Infrared thermographic survey',180,140,4.0),
+ ('FGC-01','Valve and belt inspection',90,44,5.0),
+ ('FGC-02','Valve and belt inspection',90,77,5.0),
+ ('BFP-01','Vibration route and seal check',30,9,2.0),
+ ('BFP-02','Vibration route and seal check',30,22,2.0),
+ ('CWP-01','Vibration route',60,17,1.5),
+ ('CT-01','Fan gearbox oil change',365,201,8.0),
+ ('UPS-01','Load bank and transfer test',180,63,6.0),
+ ('BATT-01','Cell impedance test',90,35,4.0),
+ ('DCS-01','Controller redundancy failover test',180,96,6.0),
+ ('PLC-GAS-01','ESD logic proof test',365,158,12.0),
+ ('VIB-MON-01','Proximity probe gap voltage check',180,70,3.0),
+ ('HIST-01','Archive integrity and retention audit',90,27,2.0)
+) AS v(tag, task, days, offset, hrs) ON v.tag = a.tag;
+GO
+
+/* ---------- outage windows ----------
+   Dated RELATIVE to deploy time so they are always current on a freshly
+   built range. Hardcoded dates would read as stale within a month and the
+   whole point of this table is that the upcoming windows are believable. */
+INSERT INTO dbo.outage_windows (unit, starts_on, ends_on, outage_type, reason, approved_by, status) VALUES
+ ('GT-01', DATEADD(day,  -96, GETDATE()), DATEADD(day,  -82, GETDATE()),'Planned','Hot gas path inspection and combustor replacement','R. Okonjo','Complete'),
+ ('XFMR-02',DATEADD(day,  -61, GETDATE()), DATEADD(day,  -60, GETDATE()),'Forced','Bushing DGA exceeded acetylene limit; unit removed from service','C. Wright','Complete'),
+ ('CT-01',  DATEADD(day,  -33, GETDATE()), DATEADD(day,  -31, GETDATE()),'Maintenance','Cells 3 and 4 fill replacement','D. Whitfield','Complete'),
+ ('GT-02',  DATEADD(day,   -6, GETDATE()), DATEADD(day,   -4, GETDATE()),'Forced','Flame scanner fault on can 7','R. Okonjo','Complete'),
+ ('BFP-01', DATEADD(day,    9, GETDATE()), DATEADD(day,   11, GETDATE()),'Planned','Mechanical seal cartridge replacement — pump out of service','D. Whitfield','Approved'),
+ ('ST-01',  DATEADD(day,   17, GETDATE()), DATEADD(day,   24, GETDATE()),'Planned','Governor overhaul and valve stroke verification','R. Okonjo','Approved'),
+ ('PLC-GAS-01',DATEADD(day,23, GETDATE()), DATEADD(day,   24, GETDATE()),'Planned','ESD proof test — burner management bypassed, unit at minimum load','P. Raghunathan','Approved'),
+ ('DCS-01', DATEADD(day,   38, GETDATE()), DATEADD(day,   39, GETDATE()),'Planned','Controller firmware upgrade and redundancy failover test','P. Raghunathan','Approved'),
+ ('XFMR-01',DATEADD(day,   52, GETDATE()), DATEADD(day,   55, GETDATE()),'Planned','Bushing replacement; 345kV line outage coordinated with ISO','C. Wright','Submitted'),
+ ('GT-01',  DATEADD(day,   89, GETDATE()), DATEADD(day,  110, GETDATE()),'Planned','Major inspection — rotor removal, 3-week unit outage','R. Okonjo','Submitted');
+GO
+
+/* ---------- work-order history ----------
+   RAND is seeded once so a rebuild reproduces this table exactly. The same
+   determinism convention billing_site uses with random.Random(42). */
+DECLARE @i INT = 1, @n INT = 420;
+DECLARE @seeded FLOAT = RAND({{ cmms_seed }});
+DECLARE @assets INT = (SELECT COUNT(*) FROM dbo.assets);
+DECLARE @techs  INT = (SELECT COUNT(*) FROM dbo.technicians);
+
+WHILE @i <= @n
+BEGIN
+    DECLARE @aid INT = (SELECT MIN(asset_id) FROM dbo.assets) + CAST(RAND() * @assets AS INT);
+    DECLARE @tid INT = (SELECT MIN(tech_id)  FROM dbo.technicians) + CAST(RAND() * @techs AS INT);
+    DECLARE @age INT = CAST(RAND() * 400 AS INT);
+    DECLARE @r   FLOAT = RAND();
+    DECLARE @wtype VARCHAR(16) = CASE WHEN @r < 0.62 THEN 'PM'
+                                      WHEN @r < 0.92 THEN 'Corrective'
+                                      ELSE 'Emergency' END;
+    DECLARE @open DATETIME2 = DATEADD(day, -@age, GETDATE());
+    DECLARE @done BIT = CASE WHEN @age > 21 THEN 1 ELSE CASE WHEN RAND() < 0.55 THEN 1 ELSE 0 END END;
+
+    INSERT INTO dbo.work_orders
+        (wo_number, asset_id, wo_type, priority, status, opened_on, due_on, closed_on, assigned_to, description, labor_hours)
+    VALUES (
+        'WO-' + RIGHT('00000' + CAST(100000 + @i AS VARCHAR(6)), 6),
+        @aid, @wtype,
+        CASE @wtype WHEN 'Emergency' THEN 1 WHEN 'Corrective' THEN 2 + CAST(RAND()*2 AS INT) ELSE 3 + CAST(RAND()*2 AS INT) END,
+        CASE WHEN @done = 1 THEN 'Closed' ELSE CASE WHEN RAND() < 0.4 THEN 'In Progress' ELSE 'Open' END END,
+        @open,
+        DATEADD(day, 7 + CAST(RAND()*21 AS INT), @open),
+        CASE WHEN @done = 1 THEN DATEADD(day, 1 + CAST(RAND()*14 AS INT), @open) ELSE NULL END,
+        @tid,
+        CASE @wtype
+            WHEN 'PM'         THEN 'Routine preventive maintenance per schedule.'
+            WHEN 'Corrective' THEN 'Corrective repair raised from operator round / condition monitoring.'
+            ELSE 'Emergency repair — equipment removed from service.'
+        END,
+        CASE WHEN @done = 1 THEN CAST(ROUND(RAND()*16 + 0.5, 1) AS DECIMAL(6,1)) ELSE NULL END
+    );
+    SET @i = @i + 1;
+END
+GO
+
+PRINT 'CMMS seed complete.';
+GO

@@ -108,9 +108,14 @@ internal_dns_records:
     value: "172.16.9.42"
     zone: "{{ domain_name }}"
 DomainUsers:
-  - name: "simspace"
-    fullname: "simspace"
-    password: "{{ vault_domain_user_password }}"
+  # The domain admin. Named xadmin to match domain_admin (group_vars/all/main.yml)
+  # and the released reference. Its password is domain_admin_password, NOT
+  # vault_domain_user_password -- create_users runs AFTER the domain_admin_grant
+  # play, so a different password here would reset the admin and break every
+  # subsequent domain auth.
+  - name: "xadmin"
+    fullname: "xadmin"
+    password: "{{ domain_admin_password }}"
     groups:
       - "Domain Admins"
   - name: "ahmed.ortega"

@@ -16,6 +16,59 @@ Severity key:
 
 
 
+## 2026-09-29 · bug · roles/group_assignment — community.windows.win_domain_user is REMOVED upstream
+
+**Symptom.** With community.windows 3.x installed, the entire baseline playbook
+fails to load:
+
+```
+[ERROR]: The 'community.windows.win_domain_user' module has been removed.
+Use microsoft.ad.user instead. This feature was removed from collection
+'community.windows' version 3.0.0.
+Origin: roles/group_assignment/tasks/main.yml:21
+```
+
+On the controller this range runs today, community.windows is pre-3.0.0 and the
+module only prints a DEPRECATION warning, so the task works and the problem is
+invisible. It becomes a hard failure the moment that controller's collections
+are updated.
+
+**Why it mattered before then.** ansible-lint runs `--syntax-check` on the
+playbook first. While this module was referenced, that check failed, so lint
+reported "Failed to load playbooks/00-baseline.yml" and NEVER EXAMINED the
+playbook at all — every finding in it was masked. A lint run that opens with
+that line is blind, not clean.
+
+**Fix (upstream).** `range-development-ansible/roles/group_assignment` should
+use `microsoft.ad.user`. The mapping is one-to-one: `win_domain_user` defaulted
+to `groups_action: replace`, and `groups: set:` is the same operation.
+
+**Workaround (overlay).** The overlay here now uses:
+
+```yaml
+- name: Group Assignment
+  microsoft.ad.user:
+    identity: "{{ item.name }}"
+    groups:
+      set: "{{ item.groups }}"
+    state: present
+```
+
+`identity` rather than `name` so this only ever UPDATES — create_users runs
+immediately before it in the same play and owns creation.
+
+NOT YET PROVEN AT RUN TIME. This task is the one that finally applied the
+Domain Admins memberships on 2026-09-28, so it is on the critical path for
+every domain join. Verify on the next deploy before trusting it; rollback is
+the previous module name with `name:` and a bare `groups:` list.
+
+**Related.** The same role was a silent no-op until 2026-09-27 because the base
+ships its tasks as `roles/group_assignment/main.yml` rather than
+`tasks/main.yml`. See that entry.
+
+---
+
+
 ## 2026-09-26 · bug · roles/ae_gpo — GPO edits need Domain Admins, which the refreshed image's local admin does not get
 
 **Symptom.** `ae_gpo` fails on the PDC, identically on all three deploy attempts:

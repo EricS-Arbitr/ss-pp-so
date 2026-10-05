@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Voltgrid Power — CMMS Client
+  Maintenance & work-order client for the plant CMMS (VoltgridCMMS on pp-sql).
+  Machine configuration. Do not edit without change control.
+-->
+<configuration>
+  <startup>
+    <supportedRuntime version="v4.0" sku=".NETFramework,Version=v4.8" />
+  </startup>
+  <appSettings>
+    <add key="Application.Name" value="Voltgrid CMMS Client" />
+    <add key="Application.Version" value="{{ cmms_client_app_version }}" />
+    <add key="Site.Name" value="Voltgrid Power" />
+    <add key="Site.DefaultPlant" value="Gas Turbine Peaker" />
+    <add key="Ui.RefreshIntervalSeconds" value="120" />
+    <add key="WorkOrders.DefaultView" value="OpenByPriority" />
+  </appSettings>
+  <connectionStrings>
+    <add name="VoltgridCmms"
+         connectionString="Data Source={{ cmms_client_sql_host }};Initial Catalog={{ cmms_client_db_name }};User ID={{ cmms_client_app_login }};Password={{ cmms_client_app_password }};TrustServerCertificate=True;Application Name=Voltgrid CMMS Client"
+         providerName="System.Data.SqlClient" />
+  </connectionStrings>
+</configuration>

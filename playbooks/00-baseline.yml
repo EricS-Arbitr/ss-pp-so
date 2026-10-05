@@ -822,6 +822,26 @@
   tags:
     - voltgrid_site
 
+# The plant's maintenance system of record. Sits with the other corporate
+# services rather than on the OT side: a CMMS is an IT-segment application
+# that happens to describe OT equipment, and that asymmetry is the point of
+# it as a scenario asset.
+- name: cmms
+  hosts: cmms
+  gather_facts: false
+  roles:
+    - cmms
+  tags:
+    - cmms
+
+- name: cmms_client
+  hosts: engineering
+  gather_facts: false
+  roles:
+    - cmms_client
+  tags:
+    - cmms_client
+
 - name: dns
   hosts: pdc
   gather_facts: false
