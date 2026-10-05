@@ -72,12 +72,21 @@
         $changed = $true
       }
 
-      # Zone NS at apex -> ns1.voltgrid.com (advertise this server as authority).
-      $ns = '{{ dmz_public_ns }}.'
-      if (-not (Get-DnsServerResourceRecord -ZoneName $zone -RRType NS -ErrorAction SilentlyContinue |
-                Where-Object { $_.RecordData.NameServer -eq $ns })) {
-        Add-DnsServerResourceRecordNS -ZoneName $zone -Name '@' -NameServer $ns.TrimEnd('.')
-        $changed = $true
+      # Zone NS at apex -> ns1.voltgrid.com. There is NO Add-DnsServerResourceRecordNS
+      # cmdlet; NS goes through the generic Add-DnsServerResourceRecord -NS. This
+      # is cosmetic (Windows already auto-creates a zone NS record pointing at the
+      # server, and resolution works off the A/MX records regardless), so a
+      # failure here must NOT fail the role -- catch and note it.
+      $ns = '{{ dmz_public_ns }}'
+      try {
+        $haveNs = Get-DnsServerResourceRecord -ZoneName $zone -RRType NS -ErrorAction SilentlyContinue |
+                  Where-Object { $_.RecordData.NameServer -eq ($ns + '.') }
+        if (-not $haveNs) {
+          Add-DnsServerResourceRecord -ZoneName $zone -Name '@' -NS -NameServer $ns -ErrorAction Stop
+          $changed = $true
+        }
+      } catch {
+        Write-Output ("NS_SKIP " + $_.Exception.Message)
       }
 
       if ($changed) { $Ansible.Changed = $true }
