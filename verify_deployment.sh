@@ -253,11 +253,14 @@ check_pf_shell pp-external-firewall \
 # =========================================================================
 section "4. Active Directory — voltgrid.com"
 
-# simspace in Domain Admins on the forest root.
+# xadmin in Domain Admins on the forest root. The domain admin was renamed from
+# simspace to xadmin when every Windows image moved to 1.2.x (the 1.2.x local
+# admin and the domain admin share one identity), matching the released
+# range-development-ansible convention.
 check_ps pp-dc01 \
-  'Get-ADGroupMember "Domain Admins" | Where-Object { $_.Name -eq "simspace" } | Select-Object -ExpandProperty Name' \
-  '\(stdout\)[[:space:]]+simspace' \
-  "voltgrid.com: simspace is in Domain Admins"
+  'Get-ADGroupMember "Domain Admins" | Where-Object { $_.Name -eq "xadmin" } | Select-Object -ExpandProperty Name' \
+  '\(stdout\)[[:space:]]+xadmin' \
+  "voltgrid.com: xadmin is in Domain Admins"
 
 # DomainUsers population — floor at 20 to catch a partial create_users run.
 check_ps pp-dc01 \
