@@ -33,27 +33,23 @@
     malcolm_uid: "{{ malcolm_user_info.uid }}"
     malcolm_gid: "{{ malcolm_user_info.group }}"
 
-- name: Create install directory
-  ansible.builtin.file:
-    path: "{{ malcolm_install_dir }}"
-    state: directory
-    owner: "{{ malcolm_user }}"
-    group: "{{ malcolm_group }}"
-    mode: "0750"
-
 # THIS ITERATION clones the Malcolm source straight from GitHub through the
 # proxy (the play sets http(s)_proxy, which git honours for https remotes),
 # pinned to the release tag. A later air-gapped pass would point
-# malcolm_repo_url at a local mirror instead. Untracked files the role creates
-# later (config/*.env, nginx certs) do not block a same-tag re-clone.
-- name: Clone the Malcolm source at the pinned release tag
-  ansible.builtin.git:
-    repo: "{{ malcolm_repo_url }}"
-    dest: "{{ malcolm_install_dir }}"
-    version: "{{ malcolm_repo_version }}"
-    depth: 1
-    force: false
+# malcolm_repo_url at a local mirror instead.
+#
+# Explicit `git clone --depth 1 --branch <tag>` rather than ansible.builtin.git:
+# the module treats a tag as a branch (refs/heads/<tag>) and, with depth set,
+# resolves it against `origin` before a repo exists -- which fails with
+# "'origin' does not appear to be a git repository". git's own --branch takes a
+# tag for a shallow clone. `creates` makes it idempotent; git clones into the
+# (absent or empty) dest, and the chown below hands the tree to the Malcolm user.
+- name: Clone the Malcolm source at the pinned release tag (shallow, via proxy)
+  ansible.builtin.command:
+    cmd: "git clone --depth 1 --branch {{ malcolm_repo_version }} {{ malcolm_repo_url }} {{ malcolm_install_dir }}"
+    creates: "{{ malcolm_install_dir }}/.git"
   register: malcolm_clone
+  changed_when: true
 
 - name: Ensure the install tree is owned by the Malcolm user
   ansible.builtin.file:
