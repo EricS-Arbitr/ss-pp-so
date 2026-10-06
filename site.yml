@@ -72,3 +72,7 @@
 # Host-scoped log sources (nginx, squid) into SO via dedicated Fleet
 # policies. AFTER 75-endpoint: it reassigns agents that phase enrols.
 - import_playbook: playbooks/80-fleet-integrations.yml
+
+# Malcolm OT traffic analysis appliance (pp-ot-malcolm, PP-OT-DMZ). STAGE 1:
+# install + run via proxy; GRE capture pipeline is STAGE 2.
+- import_playbook: playbooks/90-malcolm.yml

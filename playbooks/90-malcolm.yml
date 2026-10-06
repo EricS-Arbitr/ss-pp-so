@@ -1,0 +1,37 @@
+---
+# ============================================================
+# 90-malcolm.yml — stand up Malcolm on pp-ot-malcolm (PP-OT-DMZ)
+# ============================================================
+# STAGE 1: install + run Malcolm (CISA network-traffic analysis) via the
+# in-platform proxy, data on /mnt/Expansion. No live capture yet -- the GRE
+# mirror from pp-ot-router and the capture interface are STAGE 2.
+#
+# pp-ot-malcolm is a specialized appliance in [malcolm] only (NOT [linux]), so
+# the common baseline never runs here; this play owns its whole config.
+- name: Malcolm — OT traffic analysis appliance (pp-ot-malcolm)
+  hosts: malcolm
+  gather_facts: true
+  become: true
+  environment:
+    # git + get_url honour these; docker uses its own systemd drop-in (set by
+    # docker_engine via docker_engine_proxy), and apt uses the apt.conf below.
+    http_proxy: "{{ malcolm_proxy }}"
+    https_proxy: "{{ malcolm_proxy }}"
+    no_proxy: "{{ malcolm_no_proxy }}"
+  tags:
+    - malcolm
+  pre_tasks:
+    - name: Route apt through the in-platform proxy
+      ansible.builtin.copy:
+        dest: /etc/apt/apt.conf.d/95-malcolm-proxy
+        content: |
+          // Managed by Ansible (90-malcolm.yml)
+          Acquire::http::Proxy "{{ malcolm_proxy }}";
+          Acquire::https::Proxy "{{ malcolm_proxy }}";
+        owner: root
+        group: root
+        mode: "0644"
+  roles:
+    - malcolm_host_prep
+    - docker_engine
+    - malcolm

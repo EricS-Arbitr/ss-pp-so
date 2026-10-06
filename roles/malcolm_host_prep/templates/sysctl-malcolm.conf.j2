@@ -1,0 +1,4 @@
+# {{ ansible_managed }}
+{% for key in malcolm_host_prep_sysctls %}
+{{ key }} = {{ malcolm_host_prep_sysctls[key] }}
+{% endfor %}

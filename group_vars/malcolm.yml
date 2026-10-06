@@ -1,0 +1,34 @@
+---
+# ============================================================
+# malcolm.yml — pp-ot-malcolm (CISA Malcolm) OT traffic analysis
+# ============================================================
+# Roles: malcolm_host_prep, docker_engine, malcolm (playbooks/90-malcolm.yml).
+# pp-ot-malcolm is in [malcolm] only (NOT [linux]) -- a specialized appliance,
+# like is-inet; the common baseline does not run against it.
+
+# Zero-egress range: all apt / git / docker-pull traffic goes through the
+# in-platform proxy. ghcr.io is reachable through it (verified 2026-10-06).
+malcolm_proxy: "http://{{ inet_proxy_addr }}:{{ inet_proxy_port }}"
+malcolm_no_proxy: "localhost,127.0.0.1"
+docker_engine_proxy: "{{ malcolm_proxy }}"
+
+# Let the image's xadmin run docker directly.
+docker_engine_users:
+  - xadmin
+
+# Data lives on the Expanded image's pre-mounted 500 GB /mnt/Expansion -- no
+# partition/format step (malcolm_host_prep skips the disk when the device is
+# empty), and Malcolm's install + all its relative data paths go there.
+malcolm_host_prep_data_device: ""
+malcolm_install_dir: "/mnt/Expansion/malcolm"
+
+# STAGE 1 installs Malcolm WITHOUT live capture (PCAP-upload mode). The GRE
+# mirror from pp-ot-router and the capture interface are STAGE 2.
+malcolm_host_prep_capture_interface: ""
+malcolm_capture_interface: ""
+
+# Authentication (vaulted in group_vars/all/main.yml).
+malcolm_admin_username: analyst
+malcolm_admin_password: "{{ vault_malcolm_admin_password }}"
+malcolm_arkime_secret: "{{ vault_malcolm_arkime_secret }}"
+malcolm_node_name: "pp-ot-malcolm"

@@ -1,0 +1,7 @@
+- name: Restart Malcolm
+  ansible.builtin.systemd_service:
+    name: malcolm
+    state: restarted
+    daemon_reload: true
+  # Only restart a stack that was already up before this run's changes.
+  when: malcolm_was_active | default(false) | bool

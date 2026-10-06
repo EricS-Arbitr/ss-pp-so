@@ -1,0 +1,57 @@
+# No data-disk tasks here: on ss-pp-so the RDP_Ubuntu_Desktop_24.04_Expanded
+# image already ships a 500 GB volume mounted at /mnt/Expansion, so Malcolm's
+# data lives there (malcolm_install_dir) with no partition/format step.
+
+- name: Apply kernel tuning (sysctl.d)
+  ansible.builtin.template:
+    src: sysctl-malcolm.conf.j2
+    dest: "{{ malcolm_host_prep_sysctl_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+  register: malcolm_host_prep_sysctl_written
+
+- name: Reload sysctls # noqa: no-handler
+  ansible.builtin.command:
+    cmd: sysctl --system
+  when: malcolm_host_prep_sysctl_written is changed
+  changed_when: true
+
+- name: Set PAM limits
+  ansible.builtin.template:
+    src: limits.conf.j2
+    dest: /etc/security/limits.d/60-malcolm.conf
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Mask sleep targets
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    masked: true
+  loop:
+    - sleep.target
+    - suspend.target
+    - hibernate.target
+    - hybrid-sleep.target
+  when: malcolm_host_prep_disable_sleep | bool
+
+- name: Configure GNOME desktop
+  ansible.builtin.include_tasks: gnome.yml
+  when: malcolm_host_prep_disable_gnome_idle | bool
+
+- name: Disable APT periodic updates and unattended-upgrades
+  ansible.builtin.copy:
+    dest: /etc/apt/apt.conf.d/20auto-upgrades
+    content: |
+      // Managed by Ansible (malcolm_host_prep)
+      APT::Periodic::Update-Package-Lists "0";
+      APT::Periodic::Unattended-Upgrade "0";
+    owner: root
+    group: root
+    mode: "0644"
+  when: malcolm_host_prep_disable_auto_upgrades | bool
+
+- name: Configure capture interface
+  ansible.builtin.include_tasks: capture.yml
+  when: malcolm_host_prep_capture_interface | length > 0
