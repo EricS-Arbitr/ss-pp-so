@@ -44,7 +44,7 @@
 # "'origin' does not appear to be a git repository". git's own --branch takes a
 # tag for a shallow clone. `creates` makes it idempotent; git clones into the
 # (absent or empty) dest, and the chown below hands the tree to the Malcolm user.
-- name: Clone the Malcolm source at the pinned release tag (shallow, via proxy)
+- name: Clone the Malcolm source at the pinned release tag (shallow, via proxy)  # noqa: command-instead-of-module
   ansible.builtin.command:
     cmd: "git clone --depth 1 --branch {{ malcolm_repo_version }} {{ malcolm_repo_url }} {{ malcolm_install_dir }}"
     creates: "{{ malcolm_install_dir }}/.git"
