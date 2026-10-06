@@ -119,6 +119,10 @@
     else
       echo MISSING
     fi
+  args:
+    # pipefail (and the pipe) need bash; the shell module defaults to /bin/sh
+    # (dash on Ubuntu), which errors with "Illegal option -o pipefail".
+    executable: /bin/bash
   register: docker_engine_proxy_live
   changed_when: false
   when: docker_engine_proxy | length > 0
