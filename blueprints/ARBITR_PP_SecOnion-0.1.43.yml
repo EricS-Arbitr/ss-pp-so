@@ -165,6 +165,26 @@ resources:
     managementInterface:
       ipAddress: "10.255.240.190"
       position: "FIRST"
+# Malcolm (CISA) OT network-traffic analysis appliance, first host in PP-OT-DMZ.
+# All-in-one (OpenSearch + Logstash + Arkime + Zeek + Suricata + Strelka) so it
+# is sized above the single-purpose SO nodes. Data (PCAP + OpenSearch) lives on
+# the Expanded image's 500 GB /mnt/Expansion, not the root disk. OT traffic
+# reaches it by GRE mirror from pp-ot-router (no capture NIC), the same way
+# so-sensor-ot is fed.
+- type: "range.resource.primitive.VmInstance::1.0.0"
+  name: "pp-ot-malcolm"
+  properties:
+    image: "global/RDP_Ubuntu_Desktop_24.04_Expanded:1.2.4"
+    cpuCount: 8
+    memory: "32768"
+    networkInterfaces:
+    - name: "PP-OT-DMZ"
+      ipAddress: "192.168.90.130"
+      prefix: 27
+    hostname: "pp-ot-malcolm"
+    managementInterface:
+      ipAddress: "10.255.240.220"
+      position: "FIRST"
 - type: "range.resource.configuration.VmConfiguration::1.0.0"
   name: "download-range-vars"
   properties:
