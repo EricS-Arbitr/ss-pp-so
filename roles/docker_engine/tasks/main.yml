@@ -102,6 +102,36 @@
     - containerd
     - docker
 
+# apt auto-starts docker on install, BEFORE the proxy drop-in is written, so the
+# running daemon has no HTTPS_PROXY and image pulls try to resolve ghcr.io
+# directly -- which fails in a zero-egress range ("lookup ghcr.io ... server
+# misbehaving"). A notified restart fires too late (after the pull) and not at
+# all on a re-run where the drop-in is unchanged but the live daemon still lacks
+# it. Inspect the RUNNING dockerd's own environment and restart only when the
+# proxy is genuinely absent -- this unsticks that state without ever needlessly
+# bouncing a healthy daemon (which would stop Malcolm's containers).
+- name: Check whether the running dockerd already has the proxy
+  ansible.builtin.shell: |
+    set -o pipefail
+    pid=$(systemctl show -p MainPID --value docker)
+    if [ -n "$pid" ] && [ "$pid" != "0" ] && tr '\0' '\n' < "/proc/$pid/environ" | grep -qx "HTTPS_PROXY={{ docker_engine_proxy }}"; then
+      echo HAVE
+    else
+      echo MISSING
+    fi
+  register: docker_engine_proxy_live
+  changed_when: false
+  when: docker_engine_proxy | length > 0
+
+- name: Restart Docker to apply the proxy (only when the live daemon lacks it)
+  ansible.builtin.systemd_service:
+    name: docker
+    state: restarted
+    daemon_reload: true
+  when:
+    - docker_engine_proxy | length > 0
+    - "'MISSING' in (docker_engine_proxy_live.stdout | default('MISSING'))"
+
 - name: Add users to docker group
   ansible.builtin.user:
     name: "{{ item }}"
