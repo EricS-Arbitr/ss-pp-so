@@ -71,7 +71,6 @@ pp-dc03
 
 [corporate_servers]
 pp-file
-pp-mail
 pp-sql
 pp-syslog
 
@@ -129,7 +128,6 @@ pp-is-wkstn-2
 pp-is-wkstn-3
 pp-is-wkstn-4
 pp-file
-pp-mail
 # OT-side domain members (blueprint 145). Per host_vars comments each of
 # these is a "Domain-joined member of voltgrid.com" whose primary DNS is
 # pp-dc03 (the OT-side additional DC at 192.168.100.5) with pp-dc01 as
@@ -196,7 +194,6 @@ pp-engws
 [dmz]
 pp-www
 pp-dmz-dns
-pp-dmz-smtp
 
 [wordpress-pv]
 pp-www
@@ -263,8 +260,6 @@ pp-dcs-ctrl
 
 [winserver2019]
 pp-dmz-dns
-pp-mail
-pp-dmz-smtp
 pp-dc03
 
 [windows:children]
@@ -372,12 +367,11 @@ pp-syslog
 # It still forwards Windows event logs -- a forwarder only reads what Windows
 # already writes, which is ordinary practice even on an HMI.
 #
-# pp-dmz-dns and pp-dmz-smtp are also absent, matching ss-pp-ab. They are
-# outside the forest and outside the corporate telemetry contract.
+# pp-dmz-dns is also absent, matching ss-pp-ab -- outside the forest and
+# outside the corporate telemetry contract.
 [sysmon]
 pp-file
 pp-sql
-pp-mail
 pp-dc01
 pp-dc02
 pp-dc03
@@ -551,5 +545,14 @@ pp-dc02
 pp-dc03
 pp-file
 pp-sql
-pp-mail
 pp-dcs-ctrl
+
+# ------------------------------------------------------------
+# Malcolm (CISA) -- network traffic analysis appliance in PP-OT-DMZ, monitors
+# OT traffic. Deliberately NOT in [linux]/[windows]: like is-inet it is a
+# specialized appliance whose image config the common baseline would clobber;
+# it is driven by its own roles (docker_engine, malcolm_host_prep, malcolm --
+# role adaptation pending). Connection creds + IPs in host_vars/pp-ot-malcolm.yml.
+# ------------------------------------------------------------
+[malcolm]
+pp-ot-malcolm

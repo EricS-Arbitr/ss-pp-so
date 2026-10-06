@@ -39,14 +39,6 @@ internal_dns_records:
     zone: "{{ domain_name }}"
 
   # DMZ hosts (not AD-joined — need static records)
-  - name: "pp-dmz-smtp"
-    type: "A"
-    value: "172.16.8.3"
-    zone: "{{ domain_name }}"
-  - name: "smtp"
-    type: "A"
-    value: "172.16.8.3"
-    zone: "{{ domain_name }}"
   - name: "pp-dmz-dns"
     type: "A"
     value: "172.16.8.4"
@@ -59,10 +51,6 @@ internal_dns_records:
     zone: "{{ domain_name }}"
 
   # PTRs for non-AD-joined hosts
-  - name: "3.8.16.172.in-addr.arpa"
-    type: "PTR"
-    value: "pp-dmz-smtp.{{ domain_name }}"
-    zone: "8.16.172.in-addr.arpa"
   - name: "4.8.16.172.in-addr.arpa"
     type: "PTR"
     value: "pp-dmz-dns.{{ domain_name }}"

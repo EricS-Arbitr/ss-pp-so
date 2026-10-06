@@ -81,8 +81,8 @@
 # Ethernet0/Ethernet1/... by ifIndex order. The customer's common role
 # (xIPAddress / xDefaultGatewayAddress / xDNSServerAddress) keys on
 # InterfaceAlias = "Ethernet0" etc. — but some SimSpace Windows images
-# (notably RDP_Windows_Server_2019:1.1.0 on pp-mail) ship with default names
-# like "Ethernet"/"Ethernet 2", which makes DSC fail with
+# (notably the RDP_Windows_Server_2019 image, e.g. pp-dc03 / pp-dmz-dns) ship
+# with default names like "Ethernet"/"Ethernet 2", which makes DSC fail with
 # "Interface 'Ethernet0' is not available."
 # All Windows hosts use managementInterface.position: FIRST, so mgmt gets the
 # lowest ifIndex and becomes Ethernet0 after rename, matching host_vars.

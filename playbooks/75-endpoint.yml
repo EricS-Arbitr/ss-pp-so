@@ -20,8 +20,8 @@
 # --- Sysmon ---------------------------------------------------------------
 # Sysmon was already deployed by playbooks/00-baseline.yml, but ONLY in the
 # "apply AUE settings" play, so it reached the [aue] workstations and nothing
-# else. The DCs and corporate servers -- pp-dc01/02/03, pp-file, pp-sql,
-# pp-mail -- had none, which is precisely where process ancestry matters most
+# else. The DCs and corporate servers -- pp-dc01/02/03, pp-file, pp-sql
+# -- had none, which is precisely where process ancestry matters most
 # for reconstructing an intrusion.
 #
 # The role is idempotent (`creates_service: Sysmon64`), so re-running it

@@ -1,0 +1,29 @@
+# pp-ot-malcolm — CISA Malcolm OT traffic-analysis appliance in PP-OT-DMZ.
+#
+# SPECIALIZED APPLIANCE, managed by its own roles (docker_engine,
+# malcolm_host_prep, malcolm -- adaptation pending), NOT the common baseline.
+# It is in [malcolm] and deliberately NOT in [linux], so group_vars/linux.yml's
+# simspace creds do not apply and the common role does not clobber the image.
+#
+# Image: RDP_Ubuntu_Desktop_24.04_Expanded:1.2.4 -> xadmin / the Expanded-image
+# password (vaulted). Data (PCAP + OpenSearch) lands on the image's 500 GB
+# /mnt/Expansion, not the root disk.
+ansible_host: 10.255.240.220
+ansible_connection: ssh
+ansible_user: xadmin
+ansible_ssh_pass: "{{ vault_malcolm_ssh_password }}"
+ansible_become_method: sudo
+ansible_become_pass: "{{ vault_malcolm_ssh_password }}"
+ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+
+network_interfaces:
+  - name: "Ethernet0"            # management (10.255.240.0/20)
+    ipv4:
+      address: "10.255.240.220"
+      netmask: "255.255.240.0"
+      gateway: ""
+  - name: "Ethernet1"            # PP-OT-DMZ production (192.168.90.128/27)
+    ipv4:
+      address: "192.168.90.130"
+      netmask: "255.255.255.224"
+      gateway: "192.168.90.129"  # pp-ot-firewall (PP-OT-DMZ gateway)

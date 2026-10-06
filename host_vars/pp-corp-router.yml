@@ -79,7 +79,7 @@ remove_vyos_bgp: true
 # Mirroring it therefore also captures mgmt-plane traffic — every Ansible
 # SSH/WinRM session to every corp host. Verify on the live device before
 # enabling; if the noise is unacceptable, drop eth0 and lose PP-Services
-# (pp-dc01/02, pp-sql, pp-file, pp-mail) visibility, or add a tc filter.
+# (pp-dc01/02, pp-sql, pp-file) visibility, or add a tc filter.
 vyos_mirror_source_interfaces:
   - eth0   # PP-Services      172.16.2.0/24  (⚠ shares mgmt — see above)
   - eth1   # BP               172.16.3.0/24
