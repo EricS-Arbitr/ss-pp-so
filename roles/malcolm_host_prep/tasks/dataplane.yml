@@ -1,0 +1,49 @@
+# =========================================================================
+# dataplane.yml — correct the data-plane NIC the platform leaves broken.
+# =========================================================================
+# The VMware customization engine renders /etc/netplan/99-netcfg-vmware.yaml
+# with the data NIC as a /32 and no gateway, which isolates it: no connected
+# route to its subnet, so no path to the gateway, the GRE mirror source, or any
+# analyst subnet. pp-ot-malcolm is not in [linux], so the common role never
+# applies its network_interfaces. We override just that interface with a
+# netplan drop-in that sorts AFTER the VMware file (99-zz-*), leaving mgmt
+# (eth0) untouched so the Ansible path is unaffected.
+
+- name: Preflight — dataplane CIDR and gateway must be set
+  ansible.builtin.assert:
+    that:
+      - (malcolm_host_prep_dataplane_cidr | default('') | trim) != ''
+      - (malcolm_host_prep_dataplane_gateway | default('') | trim) != ''
+    fail_msg: >-
+      malcolm_host_prep_dataplane_iface is set but _cidr/_gateway are not.
+      _cidr is the interface address with its real prefix (e.g. .130/27);
+      _gateway is the subnet gateway for the return path.
+    quiet: true
+
+- name: Write the data-plane netplan drop-in
+  ansible.builtin.template:
+    src: netplan-dataplane.yaml.j2
+    dest: "{{ malcolm_host_prep_dataplane_netplan_file }}"
+    owner: root
+    group: root
+    mode: "0600"
+  register: malcolm_dataplane_netplan
+
+# Applied in-line (not via handler): gre_mirror.yml runs later in this same
+# role and the decap interface's RPF needs this route present now, not at the
+# end of the play.
+- name: Apply netplan so the data-plane route is live for later tasks # noqa: no-handler
+  ansible.builtin.command:
+    cmd: netplan apply
+  when: malcolm_dataplane_netplan is changed
+  changed_when: true
+
+- name: Verify the data-plane interface carries the gateway on its subnet
+  ansible.builtin.command: "ip route get {{ malcolm_host_prep_dataplane_gateway }}"
+  register: malcolm_dataplane_route
+  changed_when: false
+  retries: 5
+  delay: 2
+  until:
+    - malcolm_dataplane_route.rc == 0
+    - "('dev ' ~ malcolm_host_prep_dataplane_iface) in malcolm_dataplane_route.stdout"

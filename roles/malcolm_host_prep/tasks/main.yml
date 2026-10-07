@@ -52,6 +52,12 @@
     mode: "0644"
   when: malcolm_host_prep_disable_auto_upgrades | bool
 
+# Must precede gre_mirror: the decap interface's reverse-path check (and the
+# SOC's return path) need the data-plane route this installs.
+- name: Correct the data-plane interface (CIDR + gateway)
+  ansible.builtin.include_tasks: dataplane.yml
+  when: malcolm_host_prep_dataplane_iface | length > 0
+
 - name: Configure capture interface
   ansible.builtin.include_tasks: capture.yml
   when: malcolm_host_prep_capture_interface | length > 0

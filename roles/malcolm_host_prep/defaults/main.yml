@@ -74,6 +74,9 @@ malcolm_host_prep_gre_mirror_local: ""
 # NOT decapsulate a packet whose source does not match this exactly.
 malcolm_host_prep_gre_mirror_remote: ""
 malcolm_host_prep_gre_mirror_ttl: 64
+# Decap interface MTU. 1500 to match the mirroring router's tunnel so a full
+# frame is accepted (the kernel's gretap default is 1462).
+malcolm_host_prep_gre_mirror_mtu: 1500
 # Offloads disabled on the decap interface so captured frames reach
 # Zeek/Suricata/netsniff un-coalesced. Applied best-effort — a feature the
 # gretap device does not expose is skipped, not fatal.
@@ -82,3 +85,14 @@ malcolm_host_prep_gre_mirror_offloads_off:
   - lro
   - gso
   - tso
+
+# --- Data-plane interface correction -----------------------------------------
+# Some platform images (VMware customization) bring the data/capture NIC up as
+# a /32 with no gateway, isolating it. Set these to re-assert the correct CIDR
+# and a default route via the subnet gateway through a netplan drop-in that
+# sorts after the platform file. Empty iface skips it entirely. The host must
+# NOT depend on this interface for its Ansible/mgmt path (that stays on eth0).
+malcolm_host_prep_dataplane_iface: ""
+malcolm_host_prep_dataplane_cidr: ""
+malcolm_host_prep_dataplane_gateway: ""
+malcolm_host_prep_dataplane_netplan_file: /etc/netplan/99-zz-malcolm-dataplane.yaml

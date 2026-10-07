@@ -38,6 +38,17 @@ malcolm_host_prep_gre_mirror_iface: "otmir0"
 malcolm_host_prep_gre_mirror_local: "192.168.90.130"
 malcolm_host_prep_gre_mirror_remote: "192.168.200.202"
 
+# The VMware customization engine brings Ethernet1 up as 192.168.90.130/32 with
+# no gateway, which isolates the data plane — no route to the gateway, the GRE
+# mirror source, or the SOC — so the mirror's reverse-path check drops the decap
+# and SOC analysts cannot reach the UI. pp-ot-malcolm is not in [linux], so
+# nothing else corrects it. Re-assert the real /27 and a default route via the
+# PP-OT-DMZ gateway. Mgmt (eth0, 10.255.240.0/20) stays connected and is the
+# Ansible path, unaffected by the default route landing on eth1.
+malcolm_host_prep_dataplane_iface: "eth1"
+malcolm_host_prep_dataplane_cidr: "192.168.90.130/27"
+malcolm_host_prep_dataplane_gateway: "192.168.90.129"
+
 # Authentication (vaulted in group_vars/all/main.yml).
 malcolm_admin_username: analyst
 malcolm_admin_password: "{{ vault_malcolm_admin_password }}"

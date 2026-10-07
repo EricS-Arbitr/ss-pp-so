@@ -1,0 +1,17 @@
+# {{ ansible_managed }}
+# Corrects the data-plane NIC the VMware customization engine leaves as a /32
+# with no gateway. This file sorts AFTER 99-netcfg-vmware.yaml, so netplan
+# overrides that interface's address and adds the default route. eth0 (mgmt)
+# is intentionally not referenced here and keeps its own config.
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    {{ malcolm_host_prep_dataplane_iface }}:
+      dhcp4: false
+      dhcp6: false
+      addresses:
+        - {{ malcolm_host_prep_dataplane_cidr }}
+      routes:
+        - to: default
+          via: {{ malcolm_host_prep_dataplane_gateway }}
