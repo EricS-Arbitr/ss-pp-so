@@ -60,6 +60,26 @@
     recurse: true
   when: malcolm_clone is changed
 
+# control.py runs as the malcolm user and chdirs into the install dir. The
+# system malcolm user must be able to traverse every parent, including the
+# /mnt/Expansion mount (which is not world-traversable by default) and the
+# install dir itself. Enforced every run (cheap, non-recursive) so it is right
+# regardless of whether the clone ran this pass. "Permission denied: changing
+# directory before execution" on /mnt/Expansion/malcolm is exactly this.
+- name: Make the data mount traversable by the Malcolm user
+  ansible.builtin.file:
+    path: "{{ malcolm_install_dir | dirname }}"
+    state: directory
+    mode: "0755"
+
+- name: Ensure the install dir is owned by and traversable for the Malcolm user
+  ansible.builtin.file:
+    path: "{{ malcolm_install_dir }}"
+    state: directory
+    owner: "{{ malcolm_user }}"
+    group: "{{ malcolm_group }}"
+    mode: "0755"
+
 - name: Confirm the clone produced a Malcolm tree
   ansible.builtin.stat:
     path: "{{ malcolm_install_dir }}/docker-compose.yml"
