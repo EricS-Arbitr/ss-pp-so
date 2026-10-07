@@ -37,6 +37,24 @@
       - "set interfaces tunnel {{ vyos_gre_tunnel_iface }} mtu {{ vyos_mirror_tunnel_mtu }}"
     save: yes
 
+# Fan-out targets: one more gretap tunnel per consumer (e.g. the Malcolm OT
+# appliance alongside so-sensor-ot). Same encapsulation and MTU as the primary
+# so full frames are carried end to end. tc.yml mirrors the selected source
+# interfaces into each of these in addition to the primary tunnel.
+- name: Configure additional GRE mirror tunnels (fan-out targets)
+  vyos.vyos.vyos_config:
+    lines:
+      - "set interfaces tunnel {{ item.iface }} encapsulation gretap"
+      - "set interfaces tunnel {{ item.iface }} source-address {{ item.source_ip | default(vyos_gre_source_ip) }}"
+      - "set interfaces tunnel {{ item.iface }} remote {{ item.remote_ip }}"
+      - "set interfaces tunnel {{ item.iface }} address {{ item.local_addr }}/{{ item.prefix | default(vyos_gre_tunnel_prefix) }}"
+      - "set interfaces tunnel {{ item.iface }} description '{{ item.description | default('so-mirror fan-out') }}'"
+      - "set interfaces tunnel {{ item.iface }} mtu {{ item.mtu | default(vyos_mirror_tunnel_mtu) }}"
+    save: yes
+  loop: "{{ vyos_mirror_extra_targets | default([]) }}"
+  loop_control:
+    label: "{{ item.iface }} -> {{ item.remote_ip }}"
+
 # CLAMP TCP MSS SO MIRRORED FRAMES FIT THE TUNNEL.
 # Full rationale, and the two approaches that were measured to fail, are in
 # defaults/main.yml under vyos_mirror_adjust_mss. Short version: `tc mirred`

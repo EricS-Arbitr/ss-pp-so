@@ -22,10 +22,21 @@ docker_engine_users:
 malcolm_host_prep_data_device: ""
 malcolm_install_dir: "/mnt/Expansion/malcolm"
 
-# STAGE 1 installs Malcolm WITHOUT live capture (PCAP-upload mode). The GRE
-# mirror from pp-ot-router and the capture interface are STAGE 2.
+# STAGE 2 live-captures the OT process traffic that pp-ot-router gretap-mirrors
+# to this host. No physical SPAN NIC (so malcolm_host_prep_capture_interface
+# stays empty); instead a gretap decap interface, otmir0, is created and the
+# mirror is decapsulated onto it. Setting malcolm_capture_interface flips Zeek,
+# Suricata and netsniff-ng into live mode on that interface.
 malcolm_host_prep_capture_interface: ""
-malcolm_capture_interface: ""
+malcolm_capture_interface: "otmir0"
+
+# GRE mirror decap: frames arrive from pp-ot-router eth0 (192.168.200.202) and
+# are decapsulated onto otmir0. _local is this host's PP-OT-DMZ address
+# (Ethernet1) the mirror is aimed at; _remote is the router's GRE source.
+malcolm_host_prep_gre_mirror_enabled: true
+malcolm_host_prep_gre_mirror_iface: "otmir0"
+malcolm_host_prep_gre_mirror_local: "192.168.90.130"
+malcolm_host_prep_gre_mirror_remote: "192.168.200.202"
 
 # Authentication (vaulted in group_vars/all/main.yml).
 malcolm_admin_username: analyst

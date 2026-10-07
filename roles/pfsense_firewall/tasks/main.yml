@@ -262,6 +262,7 @@
     protocol: "{{ item.protocol | default('any') }}"
     source: "{{ item.source | default('any') }}"
     destination: "{{ item.destination | default('any') }}"
+    destination_port: "{{ item.destination_port | default(omit) }}"
   loop: "{{ pfsense_rules | default([]) }}"
 
 # FRR routing (pfSense 2.8.1 image ships pfSense-pkg-frr pre-installed).

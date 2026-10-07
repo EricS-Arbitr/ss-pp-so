@@ -1,0 +1,24 @@
+# {{ ansible_managed }}
+# gretap decap interface for a GRE traffic mirror. The kernel decapsulates
+# frames arriving from {{ malcolm_host_prep_gre_mirror_remote }} and presents
+# them on {{ malcolm_host_prep_gre_mirror_iface }} (no IP, promiscuous) for
+# Malcolm live capture. The `local`/`remote` underlay pair must match the
+# mirroring router's gretap source/remote exactly.
+[Unit]
+Description=Malcolm GRE mirror decap interface ({{ malcolm_host_prep_gre_mirror_iface }})
+After=network-online.target NetworkManager.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# Idempotent: tear any stale device down first, then (re)create it.
+ExecStartPre=-/usr/sbin/ip link del {{ malcolm_host_prep_gre_mirror_iface }}
+ExecStart=/usr/sbin/ip link add {{ malcolm_host_prep_gre_mirror_iface }} type gretap local {{ malcolm_host_prep_gre_mirror_local }} remote {{ malcolm_host_prep_gre_mirror_remote }} ttl {{ malcolm_host_prep_gre_mirror_ttl }}
+ExecStart=/usr/sbin/ip link set {{ malcolm_host_prep_gre_mirror_iface }} up promisc on
+# Best-effort offload disable; a feature the device does not expose is skipped.
+ExecStartPost=-/bin/bash -c 'for f in {{ malcolm_host_prep_gre_mirror_offloads_off | join(" ") }}; do /usr/sbin/ethtool -K {{ malcolm_host_prep_gre_mirror_iface }} $f off || true; done'
+ExecStop=-/usr/sbin/ip link del {{ malcolm_host_prep_gre_mirror_iface }}
+
+[Install]
+WantedBy=multi-user.target

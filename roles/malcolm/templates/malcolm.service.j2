@@ -9,6 +9,12 @@ Requires=docker.service
 After=docker.service network-online.target
 Wants=network-online.target
 RequiresMountsFor={{ malcolm_install_dir }}
+{% if (malcolm_host_prep_gre_mirror_enabled | default(false) | bool) and (malcolm_capture_interface | default('')) == (malcolm_host_prep_gre_mirror_iface | default('')) %}
+# Live capture binds the gretap decap interface; it must exist before the
+# capture containers start (and after a reboot the decap unit re-creates it).
+Wants=malcolm-gre-mirror.service
+After=malcolm-gre-mirror.service
+{% endif %}
 
 [Service]
 Type=oneshot

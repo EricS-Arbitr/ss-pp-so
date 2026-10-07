@@ -89,6 +89,25 @@ pfsense_rules:
     protocol: "gre"
     source: "192.168.200.202"
     destination: "172.16.9.41"
+  # STAGE 2 — Malcolm OT appliance in PP-OT-DMZ.
+  # Second GRE mirror leg: pp-ot-router -> pp-ot-malcolm. Same rationale as the
+  # sensor GRE rule above — redundant under lab permit-any, explicit so the
+  # dependency is visible and survives a tightening pass. GRE arrives on
+  # OT_TRANSIT and is routed out OT_DMZ to 192.168.90.130.
+  - name: "Allow GRE mirror pp-ot-router -> pp-ot-malcolm"
+    interface: "OT_TRANSIT"
+    protocol: "gre"
+    source: "192.168.200.202"
+    destination: "192.168.90.130"
+  # SOC analysts (pp-security) reach Malcolm's web UI over HTTPS. Traffic from
+  # 172.16.9.0/24 enters this firewall on WAN_INTERNAL (via pp-internal-router)
+  # bound for the appliance in PP-OT-DMZ.
+  - name: "Allow SOC -> pp-ot-malcolm UI (HTTPS)"
+    interface: "WAN_INTERNAL"
+    protocol: "tcp"
+    source: "172.16.9.0/24"
+    destination: "192.168.90.130"
+    destination_port: "443"
   - name: "Allow any on WAN_INTERNAL (lab)"
     interface: "WAN_INTERNAL"
   - name: "Allow any on OT_TRANSIT (lab)"

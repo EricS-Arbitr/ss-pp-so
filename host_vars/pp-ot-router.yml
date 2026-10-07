@@ -87,3 +87,33 @@ vyos_gre_tunnel_prefix: 30
 # `action pass` filters ahead of the catch-all, matching src and dst.
 vyos_mirror_exclude_cidrs:
   - "10.255.240.0/20"
+
+# --- Malcolm OT mirror (STAGE 2) — second gretap fan-out -----------------
+# The OT PROCESS segments are ALSO mirrored to pp-ot-malcolm (CISA Malcolm) in
+# PP-OT-DMZ, over its own gretap tunnel (tun1), in addition to so-sensor-ot.
+# Only the ICS/process interfaces feed Malcolm:
+#   eth1  Gas-Turbine      — PLC
+#   eth2  Gas-Turbine-Sim  — simulation
+#   eth3  PP-OT-Services   — historian + vibration sensor
+# eth4 (192.168.100.0/24) is the Windows OT control domain; Malcolm's ICS
+# protocol parsers add nothing there and so-sensor-ot already covers it, so it
+# is deliberately NOT mirrored to Malcolm.
+#
+# Underlay path: pp-ot-router eth0 (192.168.200.202) -> pp-ot-firewall ->
+# vmx3 OT_DMZ (192.168.90.129) -> pp-ot-malcolm (192.168.90.130), reached via
+# this router's default route. pp-ot-firewall passes proto 47 for it (explicit
+# rule in host_vars/pp-ot-firewall.yml; lab-mode permit-any already would).
+# The 10.255.240.0/20 exclusion above still applies — eth1/2/3 carry no mgmt
+# traffic, so Malcolm's feed is unaffected by it either way.
+vyos_mirror_extra_targets:
+  - iface: "tun1"
+    remote_ip: "192.168.90.130"        # pp-ot-malcolm PP-OT-DMZ underlay
+    source_ip: "192.168.200.202"       # eth0 — same GRE source as the sensor tunnel
+    local_addr: "10.100.3.1"
+    remote_addr: "10.100.3.2"           # documentation only (Malcolm decaps IP-less)
+    prefix: 30
+    description: "so-mirror to pp-ot-malcolm"
+    source_interfaces:
+      - eth1   # Gas-Turbine      PLC
+      - eth2   # Gas-Turbine-Sim  simulation
+      - eth3   # PP-OT-Services   historian + vibration sensor

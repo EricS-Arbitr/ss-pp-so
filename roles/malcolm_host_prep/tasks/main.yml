@@ -55,3 +55,7 @@
 - name: Configure capture interface
   ansible.builtin.include_tasks: capture.yml
   when: malcolm_host_prep_capture_interface | length > 0
+
+- name: Configure GRE mirror decap interface
+  ansible.builtin.include_tasks: gre_mirror.yml
+  when: malcolm_host_prep_gre_mirror_enabled | bool

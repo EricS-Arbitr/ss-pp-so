@@ -1,0 +1,75 @@
+# =========================================================================
+# gre_mirror.yml — gretap decap interface for a GRE traffic mirror.
+# =========================================================================
+# The mirroring router (vyos_mirror on pp-ot-router) copies whole Ethernet
+# frames into a gretap tunnel aimed at this host's underlay address. The
+# kernel decapsulates frames whose source matches the tunnel's `remote` and
+# presents them on an IP-less, promiscuous interface that Malcolm live-captures
+# on. A systemd oneshot (not netplan/NM) owns the device so it is recreated
+# deterministically on every boot and never contends with NetworkManager.
+
+- name: Preflight — GRE mirror local/remote underlay must be set
+  ansible.builtin.assert:
+    that:
+      - (malcolm_host_prep_gre_mirror_local | default('') | trim) != ''
+      - (malcolm_host_prep_gre_mirror_remote | default('') | trim) != ''
+    fail_msg: >-
+      malcolm_host_prep_gre_mirror_enabled is true but the underlay addresses
+      are unset. _local is this host's address the mirror arrives ON; _remote
+      is the mirroring router's GRE source address (its vyos_gre_source_ip).
+    quiet: true
+
+- name: Install ethtool (offload control on the decap interface)
+  ansible.builtin.apt:
+    name: ethtool
+    state: present
+    cache_valid_time: 3600
+    lock_timeout: "{{ malcolm_host_prep_apt_lock_timeout }}"
+
+# NetworkManager must not try to manage (and tear down) the gretap device.
+- name: Keep NetworkManager off the GRE mirror interface
+  ansible.builtin.copy:
+    dest: /etc/NetworkManager/conf.d/61-malcolm-gre-mirror.conf
+    content: |
+      # Managed by Ansible (malcolm_host_prep)
+      [keyfile]
+      unmanaged-devices=interface-name:{{ malcolm_host_prep_gre_mirror_iface }}
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload NetworkManager config
+
+# Apply the NM reload now, before the device is created, so NM already treats
+# the interface as unmanaged the moment it appears.
+- name: Flush handlers so NetworkManager is reloaded before the device exists
+  ansible.builtin.meta: flush_handlers
+
+- name: Install the GRE mirror decap service
+  ansible.builtin.template:
+    src: malcolm-gre-mirror.service.j2
+    dest: /etc/systemd/system/malcolm-gre-mirror.service
+    owner: root
+    group: root
+    mode: "0644"
+  register: malcolm_gre_unit
+
+- name: Enable and (re)start the GRE mirror decap service
+  ansible.builtin.systemd_service:
+    name: malcolm-gre-mirror.service
+    enabled: true
+    state: "{{ 'restarted' if malcolm_gre_unit is changed else 'started' }}"
+    daemon_reload: true
+
+# "present" is not "up with the right remote": a gretap whose remote does not
+# match the sender reads zero packets forever (same failure class as the
+# sensor's tun0, PowerPlant 2026-08-04). Assert the device is a gretap bound to
+# the configured remote.
+- name: Verify the GRE mirror interface is a gretap bound to the correct remote
+  ansible.builtin.command: "ip -d link show {{ malcolm_host_prep_gre_mirror_iface }}"
+  register: malcolm_gre_link
+  changed_when: false
+  failed_when:
+    - >-
+      malcolm_gre_link.rc != 0
+      or 'gretap' not in malcolm_gre_link.stdout
+      or ('remote ' ~ malcolm_host_prep_gre_mirror_remote) not in malcolm_gre_link.stdout

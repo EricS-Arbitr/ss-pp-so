@@ -58,3 +58,27 @@ malcolm_host_prep_capture_offloads_off:
   - sg
   - rxvlan
   - txvlan
+
+# --- GRE mirror decap interface ----------------------------------------------
+# When this host receives its monitored traffic as a gretap GRE mirror from a
+# router (vyos_mirror) rather than a physical SPAN NIC, create a local gretap
+# tunnel the kernel decapsulates into an IP-less, promiscuous capture
+# interface. Point malcolm_capture_interface at the SAME name to live-capture
+# on it. This is independent of malcolm_host_prep_capture_interface above (that
+# one strips the IP from an existing physical NIC); use one or the other.
+malcolm_host_prep_gre_mirror_enabled: false
+malcolm_host_prep_gre_mirror_iface: otmir0
+# This host's own underlay address the mirror arrives ON (gretap `local`).
+malcolm_host_prep_gre_mirror_local: ""
+# The mirroring router's GRE source address (gretap `remote`). The kernel will
+# NOT decapsulate a packet whose source does not match this exactly.
+malcolm_host_prep_gre_mirror_remote: ""
+malcolm_host_prep_gre_mirror_ttl: 64
+# Offloads disabled on the decap interface so captured frames reach
+# Zeek/Suricata/netsniff un-coalesced. Applied best-effort — a feature the
+# gretap device does not expose is skipped, not fatal.
+malcolm_host_prep_gre_mirror_offloads_off:
+  - gro
+  - lro
+  - gso
+  - tso

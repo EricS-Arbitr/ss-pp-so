@@ -67,3 +67,27 @@ vyos_mirror_tunnel_mtu: 1500
 # Set it where the mgmt IP SHARES a mirrored data interface, which is the case
 # on PowerPlant's routers (see ss-pp-ab host_vars/pp-*-router.yml).
 vyos_mirror_exclude_cidrs: []
+
+# --- Additional mirror targets (fan-out to a second consumer) --------------
+# The SAME mirrored frames can feed more than one consumer. On ss-pp-so the OT
+# process segments go to so-sensor-ot (the primary tunnel above) AND to the
+# Malcolm OT appliance, each over its own gretap tunnel. Default empty leaves
+# single-target routers (pp-corp-router, pp-isp-router) unchanged.
+#
+# Each entry builds one MORE gretap tunnel on this router and mirrors the
+# listed interfaces into it, IN ADDITION to the primary tunnel:
+#   - iface:             tunnel device name, must not collide with
+#                        vyos_gre_tunnel_iface or another target
+#     remote_ip:         the consumer's UNDERLAY address (kernel decaps there)
+#     source_ip:         this router's GRE source (default: vyos_gre_source_ip)
+#     local_addr:        this tunnel's overlay address (unique /30 per tunnel)
+#     prefix:            overlay prefix length (default 30)
+#     remote_addr:       the far overlay address — documentation only
+#     mtu:               tunnel MTU (default vyos_mirror_tunnel_mtu)
+#     description:       shown in `show interfaces tunnel`
+#     source_interfaces: which of this router's ifaces feed THIS target
+#                        (a subset of vyos_mirror_source_interfaces)
+#
+# The MSS clamp is applied to vyos_mirror_source_interfaces and so already
+# covers any interface a fan-out target reuses; no extra clamp is needed.
+vyos_mirror_extra_targets: []
