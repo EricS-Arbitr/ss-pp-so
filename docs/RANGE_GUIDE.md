@@ -21,6 +21,7 @@ is the only SIEM; every log source on the range reports to it.
 | **OT enclave** | Four segments behind a dedicated firewall — control, turbine, turbine-sim, OT services |
 | **SIEM** | Security Onion 2.4 distributed — manager, search node, three sensors |
 | **Network visibility** | Three GRE `gretap` mirrors covering corporate, OT and the attack path |
+| **OT deep-packet analysis** | Malcolm (CISA) on PP-OT-DMZ — the OT process segments are mirrored to it for ICS-protocol parsing (OPC-UA, Modbus, S7, DNP3) in addition to Security Onion |
 | **Endpoint visibility** | Elastic Agent on Windows and Linux hosts, enrolled into SO's Fleet |
 | **Application log sources** | nginx, Squid, pfSense and VyOS, parsed into their own datasets |
 | **Analyst positions** | Six dedicated hunt workstations on the security segment |
@@ -203,8 +204,8 @@ Traffic is copied from router interfaces into `gretap` tunnels with `tc mirred`.
 | Property | Value |
 |---|---|
 | Encapsulation | `gretap` (layer 2) — Zeek's AF_PACKET plugin requires Ethernet frames; a layer-3 `gre` tunnel yields `DLT_RAW` and produces zero connection logs while Suricata continues to alert |
-| Tunnel MTU | 1462 — 1500 less 20 (outer IP), 4 (GRE), 14 (inner Ethernet) |
-| Mechanism | `tc` ingress and root `prio` qdiscs per source interface, `matchall action mirred egress mirror dev tun0` |
+| Tunnel MTU | 1500 — raised above the kernel's 1462 `gretap` default so a full mirrored frame is accepted; the routers clamp TCP MSS to 1400 to keep segments within the 1500-byte routed underlay |
+| Mechanism | `tc` ingress and root `prio` qdiscs per source interface, `matchall action mirred egress mirror dev tun0`. On `pp-ot-router` the OT process interfaces fan out to a second tunnel as well (`… mirred … dev tun0 pipe action mirred … dev tun1`), feeding Malcolm alongside the sensor |
 | Persistence | `/config/scripts/vyatta-postconfig-bootup.script`, re-applied at boot |
 | Exclusions | `10.255.240.0/20` passed on src and dst ahead of the mirror |
 
@@ -291,6 +292,45 @@ SOC web interface: **`https://172.16.9.30`**
 
 Reach it from a hunt workstation. SOC is configured for IP access, so there is
 no hostname to resolve.
+
+---
+
+## Malcolm — OT deep-packet analysis
+
+`pp-ot-malcolm` is a CISA Malcolm appliance on the PP-OT-DMZ segment
+(`192.168.90.130`), dedicated to the OT enclave. Security Onion sees the same
+OT traffic, but Malcolm adds the ICS protocol parsers — OPC-UA, Modbus, S7,
+DNP3, EtherNet/IP — that make process traffic legible as process traffic rather
+than opaque TCP.
+
+| Property | Value |
+|---|---|
+| Host | `pp-ot-malcolm`, PP-OT-DMZ `192.168.90.130`, mgmt `10.255.240.220` |
+| Stack | Malcolm 26.09.0 (OpenSearch, Arkime, Zeek, Suricata, Logstash) under Docker |
+| Capture | live on `otmir0` — Zeek, Suricata and netsniff-ng read the decapsulated mirror |
+| Feed | a `gretap` mirror from `pp-ot-router` carrying the process segments |
+| Web UI | `https://192.168.90.130`, basic auth `analyst` |
+
+### What it monitors
+
+`pp-ot-router` mirrors only the process segments to Malcolm — the PLC on
+Gas-Turbine (`eth1`), the simulation on Gas-Turbine-Sim (`eth2`), and the
+historian and vibration sensor on OT-Services (`eth3`). The Windows OT control
+domain (`eth4`, `192.168.100.0/24`) is **not** sent to Malcolm: its ICS
+parsers add nothing to Active Directory traffic, and `so-sensor-ot` already
+covers that segment.
+
+The mirror is a second `gretap` tunnel (`tun1`) from `pp-ot-router`, built the
+same way as the sensor feed. Frames arrive at `192.168.90.130` and the kernel
+decapsulates them onto `otmir0` — an IP-less, promiscuous interface that
+Malcolm live-captures. The tunnel is receive-only: Malcolm observes, it never
+replies to the mirrored flows.
+
+### SOC access
+
+The SOC (`pp-security`, `172.16.9.0/24`) reaches the Malcolm UI over HTTPS
+through `pp-ot-firewall`. Reach it from a hunt workstation at
+`https://192.168.90.130`.
 
 ---
 
