@@ -1,12 +1,19 @@
 # --- Release -----------------------------------------------------------------
 # Pinned Malcolm release. Configuration options change between versions, so
 # bump this deliberately together with the checksum.
-malcolm_version: "26.09.0"
+malcolm_version: "26.08.0"
 # This iteration clones the source from GitHub (through the proxy) at the tag,
 # rather than downloading a release bundle. Point malcolm_repo_url at a local
 # mirror for a future air-gapped pass.
 malcolm_repo_url: "https://github.com/cisagov/Malcolm.git"
 malcolm_repo_version: "v{{ malcolm_version }}"
+
+# NEXUS SOURCING (2026-10-15): when set, download+unpack the pinned Malcolm
+# source tarball from the in-platform Nexus (ng_raw) instead of cloning github.
+# Empty = original git-clone behaviour. Reached via the mgmt proxy; internal CA
+# so validate_certs is off. The tarball is contents-at-root (docker-compose.yml
+# at top), so it unpacks straight into malcolm_install_dir.
+malcolm_source_artifact_url: ""
 
 # Container image registry. Point at a local mirror for air-gapped use; the
 # compose file's image references are rewritten when this differs.

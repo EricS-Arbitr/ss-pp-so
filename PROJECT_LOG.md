@@ -139,11 +139,16 @@ Transitioned:
 - **Docker CE** — `docker_engine` installs docker-ce from `ng-apt` when
   `docker_engine_use_nexus_apt` is true (set in `group_vars/malcolm.yml`), skipping
   download.docker.com.
+- **Malcolm** — pin reverted **26.09.0 → 26.08.0** (the original version, which is
+  what Nexus holds; owner decision 2026-10-15). Source now unpacked from the Nexus
+  `ng_raw` tarball (`malcolm_source_artifact_url`, gates the github clone); images
+  pulled from the Nexus docker registry (`malcolm_image_registry` →
+  `nexus-docker…/idaholab/malcolm`, tag 26.08.0), with `nexus-docker` added to
+  dockerd `insecure-registries` for its internal CA. All 26.08.0 artifacts verified
+  present in Nexus. (NB: vCity/Repos `pins.env` still says Malcolm 26.09.0 — reconcile
+  the cache spec if the cache should match this branch.)
 
 NOT transitioned (deliberate):
-- **Malcolm source + images** — worksheet points at **26.08.0**, repo pins **26.09.0**;
-  left on github/ghcr to avoid a silent downgrade. Upload 26.09.0 to Nexus (or
-  decide to pin 26.08.0) to transition.
 - **Base Ubuntu apt** (archive.ubuntu.com) — `ng-apt` still missing the image-verified
   8-deb gap (acl, python3-docker/-dotenv/-websocket/-ruamel.yaml{,.clib} jammy;
   containernetworking-plugins, python3-docker/-websocket, python3.12-venv noble);
