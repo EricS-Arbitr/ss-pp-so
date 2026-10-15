@@ -12,6 +12,13 @@ malcolm_proxy: "http://{{ inet_proxy_addr }}:{{ inet_proxy_port }}"
 malcolm_no_proxy: "localhost,127.0.0.1"
 docker_engine_proxy: "{{ malcolm_proxy }}"
 
+# NEXUS SOURCING (2026-10-15): pull Docker CE from the in-platform ng-apt repo
+# instead of download.docker.com. docker-ce/-cli/containerd.io/buildx/compose are
+# all in ng-apt; the role writes the ng-apt source + proxy/verify-off drop-in and
+# skips the docker.com key + repo. (Base Ubuntu packages still come from
+# archive.ubuntu.com via the proxy until ng-apt carries the full closure.)
+docker_engine_use_nexus_apt: true
+
 # Let the image's xadmin run docker directly.
 docker_engine_users:
   - xadmin

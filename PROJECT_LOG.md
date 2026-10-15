@@ -115,3 +115,39 @@ Cleanup in `ss-pp-ab`:
 - Latest size: ~185K
 - Contents: 51 host_vars, 5 group_vars, 29 roles, hosts, playbooks/00-baseline.yml, deploy.sh
 - Excluded by design: `UPSTREAM_FIXES.md`, `PROJECT_LOG.md` (local docs)
+
+## 2026-10-15 · Branch `nexus-sourcing` — source artifacts from the in-platform Nexus
+
+Transitioned externally-sourced artifacts off the internet (reached via the mgmt
+proxy) onto the in-platform SimSpace Nexus, driven by the filled-in
+`ss-pp-so-nexus-locations` worksheet. Nexus is reachable ONLY through the mgmt
+proxy and presents an internal-CA cert, so every Nexus fetch keeps the proxy and
+skips TLS verification (`--ignore-certs` / `validate_certs: false` /
+`--src-tls-verify=false` / apt `Verify-Peer false`). All changes are
+backward-compatible: an empty source var restores the original github/ghcr path.
+
+Transitioned:
+- **Galaxy** — `requirements.yml` now lists all 9 collections as Nexus `ng_raw/galaxy`
+  tarball URLs; `deploy.sh` installs with `--ignore-certs`.
+- **SO source** — `so_apt_mirror` downloads the pinned source tarball from Nexus
+  when `so_source_artifact_url` is set (gates the github clone).
+- **SO airgap content** (resources/yara/playbooks) — Nexus tarballs when
+  `so_airgap_artifact_base` is set (gates the github clones).
+- **SO container images** — `build_so_registry.sh.j2` pulls from `so_registry_source`
+  (set to the Nexus docker registry) instead of ghcr.io; on-range registry served
+  to the grid is unchanged.
+- **Docker CE** — `docker_engine` installs docker-ce from `ng-apt` when
+  `docker_engine_use_nexus_apt` is true (set in `group_vars/malcolm.yml`), skipping
+  download.docker.com.
+
+NOT transitioned (deliberate):
+- **Malcolm source + images** — worksheet points at **26.08.0**, repo pins **26.09.0**;
+  left on github/ghcr to avoid a silent downgrade. Upload 26.09.0 to Nexus (or
+  decide to pin 26.08.0) to transition.
+- **Base Ubuntu apt** (archive.ubuntu.com) — `ng-apt` still missing the image-verified
+  8-deb gap (acl, python3-docker/-dotenv/-websocket/-ruamel.yaml{,.clib} jammy;
+  containernetworking-plugins, python3-docker/-websocket, python3.12-venv noble);
+  left on the proxy until those are uploaded.
+- **PyPI** (Flask/Werkzeug/gunicorn) + **so-setup upstream** (repo.securityonion.net,
+  Elastic) — no Nexus location provided; unchanged.
+- **Windows/EDR/CA, wordpress/mariadb** — already Nexus-sourced; no change.

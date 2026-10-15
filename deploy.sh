@@ -342,10 +342,14 @@ if compgen -G "collections/*.tar.gz" > /dev/null 2>&1; then
 fi
 
 if [ -f requirements.yml ]; then
-	echo "=== Galaxy fallback for anything not vendored ==="
+	echo "=== Installing collections from Nexus (ng_raw/galaxy) ==="
 	echo "    target: $COLLECTIONS_DIR"
+	# requirements.yml points at the in-platform Nexus, which is reachable ONLY
+	# through the mgmt proxy and presents an internal-CA cert -- hence HTTPS_PROXY
+	# plus --ignore-certs. A failure here is non-fatal: pfsensible.core is already
+	# vendored above and the rest ship in the controller's ansible package.
 	HTTPS_PROXY="http://10.255.240.1:3128" \
-		ansible-galaxy collection install -r requirements.yml -p "$COLLECTIONS_DIR" 2>&1 \
+		ansible-galaxy collection install -r requirements.yml -p "$COLLECTIONS_DIR" --ignore-certs 2>&1 \
 		|| echo "WARN: galaxy install returned non-zero; continuing"
 fi
 

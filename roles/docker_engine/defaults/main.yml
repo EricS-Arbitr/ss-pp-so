@@ -1,3 +1,16 @@
+# NEXUS SOURCING (2026-10-15): when true, install Docker CE from the in-platform
+# Nexus apt repo (ng-apt, dist=simspace comp=main) instead of download.docker.com.
+# docker-ce/-cli/containerd.io/buildx/compose are all present in ng-apt. Nexus is
+# reached ONLY via the mgmt proxy and presents an internal-CA cert, so this writes
+# the ng-apt source (trusted=yes) + a proxy/verify-off apt drop-in and SKIPS the
+# download.docker.com key + repo. Set per-host/group (e.g. group_vars/malcolm.yml).
+docker_engine_use_nexus_apt: false
+docker_engine_nexus_apt_url: "https://nexus.dev.ng.simspace.lan/repository/ng-apt/"
+docker_engine_nexus_apt_dist: "simspace"
+docker_engine_nexus_apt_component: "main"
+docker_engine_nexus_apt_host: "nexus.dev.ng.simspace.lan"
+docker_engine_nexus_apt_proxy: "http://{{ inet_proxy_addr }}:{{ inet_proxy_port }}"
+
 # Docker's upstream apt repo. Point these at a local mirror for air-gapped use.
 docker_engine_repo_url: https://download.docker.com/linux/ubuntu
 docker_engine_gpg_key_url: "{{ docker_engine_repo_url }}/gpg"
