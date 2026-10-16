@@ -17,39 +17,10 @@
     cache_valid_time: 3600
     lock_timeout: "{{ docker_engine_apt_lock_timeout }}"
 
-# --- NEXUS SOURCING: Docker CE from the in-platform ng-apt repo ------------
-# When docker_engine_use_nexus_apt is true, configure the ng-apt source (routed
-# through the mgmt proxy, internal-CA TLS skipped) and skip the download.docker.com
-# key + repo below. docker-ce and friends install from ng-apt instead.
-- name: Configure Nexus ng-apt source for Docker CE
-  when: docker_engine_use_nexus_apt | bool
-  block:
-    - name: Write ng-apt apt source (trusted; GPG handled by trusted=yes)
-      ansible.builtin.copy:
-        dest: /etc/apt/sources.list.d/nexus.list
-        content: >-
-          deb [arch={{ docker_engine_repo_arch }} trusted=yes]
-          {{ docker_engine_nexus_apt_url }}
-          {{ docker_engine_nexus_apt_dist }}
-          {{ docker_engine_nexus_apt_component }}
-        owner: root
-        group: root
-        mode: "0644"
-      register: docker_engine_nexus_src
-
-    - name: Route Nexus through the mgmt proxy and skip internal-CA TLS verify
-      ansible.builtin.copy:
-        dest: /etc/apt/apt.conf.d/99nexus
-        content: |
-          Acquire::https::Proxy::{{ docker_engine_nexus_apt_host }} "{{ docker_engine_nexus_apt_proxy }}";
-          Acquire::http::Proxy::{{ docker_engine_nexus_apt_host }}  "{{ docker_engine_nexus_apt_proxy }}";
-          Acquire::https::{{ docker_engine_nexus_apt_host }}::Verify-Peer "false";
-          Acquire::https::{{ docker_engine_nexus_apt_host }}::Verify-Host "false";
-        owner: root
-        group: root
-        mode: "0644"
-      register: docker_engine_nexus_conf
-
+# NEXUS SOURCING: when docker_engine_use_nexus_apt is true, docker-ce installs
+# from the in-platform ng-apt repo and the download.docker.com key + repo below
+# are skipped. The ng-apt source itself is configured by the `nexus_apt` role
+# (single owner), which runs on this host before docker_engine.
 - name: Create apt keyrings directory
   ansible.builtin.file:
     path: "{{ docker_engine_keyring | dirname }}"
@@ -86,8 +57,7 @@
   when: >-
     (docker_engine_key.changed | default(false)) or
     (docker_engine_repo.changed | default(false)) or
-    (docker_engine_nexus_src.changed | default(false)) or
-    (docker_engine_nexus_conf.changed | default(false))
+    (docker_engine_use_nexus_apt | bool)
 
 - name: Install Docker Engine and Compose plugin
   ansible.builtin.apt:

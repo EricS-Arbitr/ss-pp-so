@@ -153,11 +153,18 @@ Transitioned:
   present in Nexus. (NB: vCity/Repos `pins.env` still says Malcolm 26.09.0 — reconcile
   the cache spec if the cache should match this branch.)
 
+- **Base Ubuntu apt** — new `nexus_apt` role points every managed Ubuntu host
+  (`linux:malcolm`) at `ng-apt` (dist=simspace comp=main) via the mgmt proxy +
+  internal-CA verify-off, pinned above archive.ubuntu.com (priority 1001) so any
+  package ng-apt carries installs from Nexus. Imported as `playbooks/12-nexus-apt.yml`
+  before the baseline's first apt install. archive.ubuntu.com stays as a fallback
+  (`nexus_apt_disable_upstream: false`); the image-verified 8-deb gap is now in
+  ng-apt (verified 2026-10-16). `docker_engine`'s own ng-apt block was removed —
+  `nexus_apt` is the single owner; docker_engine only skips download.docker.com.
+- **PyPI** (billing_site) — pip installs Flask/Werkzeug/gunicorn + closure from
+  `ng_pypi` (`billing_pip_extra_args` = `--index-url …/ng_pypi/simple --trusted-host`),
+  all 11 wheels verified present in Nexus.
+
 NOT transitioned (deliberate):
-- **Base Ubuntu apt** (archive.ubuntu.com) — `ng-apt` still missing the image-verified
-  8-deb gap (acl, python3-docker/-dotenv/-websocket/-ruamel.yaml{,.clib} jammy;
-  containernetworking-plugins, python3-docker/-websocket, python3.12-venv noble);
-  left on the proxy until those are uploaded.
-- **PyPI** (Flask/Werkzeug/gunicorn) + **so-setup upstream** (repo.securityonion.net,
-  Elastic) — no Nexus location provided; unchanged.
+- **so-setup upstream** (repo.securityonion.net, Elastic) — no Nexus location; unchanged.
 - **Windows/EDR/CA, wordpress/mariadb** — already Nexus-sourced; no change.

@@ -1,0 +1,14 @@
+---
+# 12-nexus-apt.yml — point every managed Ubuntu host at the in-platform Nexus
+# apt repo (ng-apt) BEFORE the baseline's first apt install, so role package
+# installs come from Nexus (pinned above archive.ubuntu.com) instead of the
+# internet. Imported by site.yml right after 10-mirror (controller-only) and
+# before 00-baseline. See roles/nexus_apt.
+- name: Nexus apt sourcing — prefer ng-apt on managed Ubuntu hosts
+  hosts: linux:malcolm
+  gather_facts: true
+  become: true
+  roles:
+    - nexus_apt
+  tags:
+    - nexus_apt
