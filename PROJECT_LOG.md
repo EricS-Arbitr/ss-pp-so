@@ -153,14 +153,20 @@ Transitioned:
   present in Nexus. (NB: vCity/Repos `pins.env` still says Malcolm 26.09.0 — reconcile
   the cache spec if the cache should match this branch.)
 
-- **Base Ubuntu apt** — new `nexus_apt` role points every managed Ubuntu host
-  (`linux:malcolm`) at `ng-apt` (dist=simspace comp=main) via the mgmt proxy +
-  internal-CA verify-off, pinned above archive.ubuntu.com (priority 1001) so any
-  package ng-apt carries installs from Nexus. Imported as `playbooks/12-nexus-apt.yml`
-  before the baseline's first apt install. archive.ubuntu.com stays as a fallback
-  (`nexus_apt_disable_upstream: false`); the image-verified 8-deb gap is now in
-  ng-apt (verified 2026-10-16). `docker_engine`'s own ng-apt block was removed —
-  `nexus_apt` is the single owner; docker_engine only skips download.docker.com.
+- **Base Ubuntu apt (NOBLE host only)** — new `nexus_apt` role points `ng-apt`
+  (dist=simspace comp=main) via the mgmt proxy + internal-CA verify-off, pinned
+  above archive.ubuntu.com (priority 1001). Applied via `playbooks/12-nexus-apt.yml`
+  to `[malcolm]` ONLY (the noble host), before the baseline's first apt install.
+  `docker_engine`'s own ng-apt block was removed — `nexus_apt` is the single owner;
+  docker_engine only skips download.docker.com.
+  - **JAMMY hosts deliberately excluded.** `ng-apt` is a single mixed-release repo,
+    so on jammy its noble packages (e.g. `libc6 2.43`) outrank jammy's (`2.35`) and
+    poison apt core-lib resolution — proven 2026-10-16: `apache2` on `pp-proxy`
+    failed with `libc-bin: Depends: libc6 (< 2.36) but 2.43-4 is to be installed`.
+    Sourcing jammy packages from Nexus needs **per-release dists** (simspace-jammy /
+    simspace-noble) or a separate `ng-apt-jammy` repo; until then jammy stays on
+    archive.ubuntu.com (via the proxy). The FINAL jammy debs are uploaded to ng-apt
+    but not consumed yet for this reason.
 - **PyPI** (billing_site) — pip installs Flask/Werkzeug/gunicorn + closure from
   `ng_pypi` (`billing_pip_extra_args` = `--index-url …/ng_pypi/simple --trusted-host`),
   all 11 wheels verified present in Nexus.
