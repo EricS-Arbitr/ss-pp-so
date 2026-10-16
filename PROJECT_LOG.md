@@ -132,7 +132,12 @@ Transitioned:
 - **SO source** — `so_apt_mirror` downloads the pinned source tarball from Nexus
   when `so_source_artifact_url` is set (gates the github clone).
 - **SO airgap content** (resources/yara/playbooks) — Nexus tarballs when
-  `so_airgap_artifact_base` is set (gates the github clones).
+  `so_airgap_artifact_base` is set (gates the github clones). `so_manager` now
+  extracts each content repo with `--strip-components=1` into `item.dest`, so the
+  tarball's top-dir name is irrelevant — the Nexus `securityonion-yara` tarball is
+  a GitHub-archive (`securityonion-yara-<sha>/`), which the old
+  extract-into-parent approach landed at the wrong path (deploy failure
+  2026-10-16: `/nsm/rules/detect-yara/repos/securityonion-yara` missing).
 - **SO container images** — `build_so_registry.sh.j2` pulls from `so_registry_source`
   (set to the Nexus docker registry) instead of ghcr.io; on-range registry served
   to the grid is unchanged.
