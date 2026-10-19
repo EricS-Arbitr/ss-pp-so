@@ -12,14 +12,16 @@ malcolm_proxy: "http://{{ inet_proxy_addr }}:{{ inet_proxy_port }}"
 malcolm_no_proxy: "localhost,127.0.0.1"
 docker_engine_proxy: "{{ malcolm_proxy }}"
 
-# NEXUS SOURCING (2026-10-15): pull Docker CE from the in-platform ng-apt repo
-# instead of download.docker.com. docker-ce/-cli/containerd.io/buildx/compose are
-# all in ng-apt; the role writes the ng-apt source + proxy/verify-off drop-in and
-# skips the docker.com key + repo. (Base Ubuntu packages still come from
-# archive.ubuntu.com via the proxy until ng-apt carries the full closure.)
-docker_engine_use_nexus_apt: true
+# Docker CE from download.docker.com (via the proxy), NOT ng-apt. ng-apt is a
+# single mixed-release repo (jammy+noble+plucky) and plucky's docker-ce outranks
+# noble's, so an apt pin preferring ng-apt pulls the wrong release and breaks
+# dependency resolution (proven on this noble host 2026-10-16). Sourcing docker-ce
+# from Nexus needs per-release apt repos; until then it stays on download.docker.com.
+docker_engine_use_nexus_apt: false
 
-# NEXUS SOURCING (2026-10-15): Malcolm 26.08.0 source + images from Nexus.
+# NEXUS SOURCING: Malcolm 26.08.0 source + images from Nexus. (These are a raw
+# tarball + a docker registry, NOT apt, so the mixed-release apt problem above
+# does not apply.)
 #   - source tarball from ng_raw (unpacked into the install dir; gates the clone)
 #   - image_registry rewrites the compose refs to the Nexus docker registry
 # The Nexus docker registry uses an internal CA, so dockerd must treat it as an

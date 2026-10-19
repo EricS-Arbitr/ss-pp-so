@@ -141,9 +141,6 @@ Transitioned:
 - **SO container images** — `build_so_registry.sh.j2` pulls from `so_registry_source`
   (set to the Nexus docker registry) instead of ghcr.io; on-range registry served
   to the grid is unchanged.
-- **Docker CE** — `docker_engine` installs docker-ce from `ng-apt` when
-  `docker_engine_use_nexus_apt` is true (set in `group_vars/malcolm.yml`), skipping
-  download.docker.com.
 - **Malcolm** — pin reverted **26.09.0 → 26.08.0** (the original version, which is
   what Nexus holds; owner decision 2026-10-15). Source now unpacked from the Nexus
   `ng_raw` tarball (`malcolm_source_artifact_url`, gates the github clone); images
@@ -153,20 +150,22 @@ Transitioned:
   present in Nexus. (NB: vCity/Repos `pins.env` still says Malcolm 26.09.0 — reconcile
   the cache spec if the cache should match this branch.)
 
-- **Base Ubuntu apt (NOBLE host only)** — new `nexus_apt` role points `ng-apt`
-  (dist=simspace comp=main) via the mgmt proxy + internal-CA verify-off, pinned
-  above archive.ubuntu.com (priority 1001). Applied via `playbooks/12-nexus-apt.yml`
-  to `[malcolm]` ONLY (the noble host), before the baseline's first apt install.
-  `docker_engine`'s own ng-apt block was removed — `nexus_apt` is the single owner;
-  docker_engine only skips download.docker.com.
-  - **JAMMY hosts deliberately excluded.** `ng-apt` is a single mixed-release repo,
-    so on jammy its noble packages (e.g. `libc6 2.43`) outrank jammy's (`2.35`) and
-    poison apt core-lib resolution — proven 2026-10-16: `apache2` on `pp-proxy`
-    failed with `libc-bin: Depends: libc6 (< 2.36) but 2.43-4 is to be installed`.
-    Sourcing jammy packages from Nexus needs **per-release dists** (simspace-jammy /
-    simspace-noble) or a separate `ng-apt-jammy` repo; until then jammy stays on
-    archive.ubuntu.com (via the proxy). The FINAL jammy debs are uploaded to ng-apt
-    but not consumed yet for this reason.
+- **Base Ubuntu apt + Docker CE — NOT transitioned (BLOCKED).** Attempted a
+  `nexus_apt` role (ng-apt source + priority pin) but `ng-apt` is a single
+  **mixed-release** repo (dist=simspace holds jammy + noble + **plucky** debs).
+  apt chooses by version across all three and plucky outranks the rest, so any pin
+  preferring ng-apt pulls wrong-release packages and breaks dependency resolution —
+  proven twice 2026-10-16: jammy (`apache2` on `pp-proxy` → `libc-bin` needs
+  `libc6<2.36`) and noble (malcolm prereqs → a >1000 pin tries to downgrade
+  `python3-dotenv` to jammy `0.19.2`, dragging in jammy `ruamel.yaml.clib`
+  (`python3<3.11`) and plucky `python3 3.13`). Even docker-ce is unsafe (plucky
+  docker-ce is the highest version). **Reverted:** `nexus_apt` role deleted;
+  `playbooks/12-nexus-apt.yml` is now a cleanup play that strips any ng-apt config a
+  prior run left; `docker_engine_use_nexus_apt: false` (back to download.docker.com).
+  Every Ubuntu host stays on archive.ubuntu.com via the mgmt proxy.
+  **To source apt from Nexus → needs PER-RELEASE dists/repos** (simspace-jammy /
+  simspace-noble, or ng-apt-jammy / ng-apt-noble). The uploaded FINAL debs are fine
+  but cannot be consumed from a mixed-release dist.
 - **PyPI** (billing_site) — pip installs Flask/Werkzeug/gunicorn + closure from
   `ng_pypi` (`billing_pip_extra_args` = `--index-url …/ng_pypi/simple --trusted-host`),
   all 11 wheels verified present in Nexus.

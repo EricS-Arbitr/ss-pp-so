@@ -1,41 +1,32 @@
 ---
-# 12-nexus-apt.yml — point NOBLE hosts at the in-platform Nexus apt repo (ng-apt)
-# BEFORE the baseline's first apt install, so their role package installs come
-# from Nexus (pinned above archive.ubuntu.com) instead of the internet.
+# 12-nexus-apt.yml — ensure NO managed Ubuntu host carries the ng-apt apt source.
 #
-# NOBLE ONLY, on purpose. ng-apt is a single mixed-release repo (dist=simspace
-# holds jammy + noble + plucky debs). On a NOBLE host that is safe: ng-apt's
-# highest-version packages are the noble ones, which match the host. On a JAMMY
-# host it is NOT: ng-apt's noble packages (e.g. libc6 2.43) outrank jammy's
-# (2.35) and apt tries to pull them in, breaking core-lib dependency resolution
-# (deploy failure 2026-10-16: apache2 on pp-proxy -> libc-bin needs libc6<2.36).
-# Sourcing JAMMY packages from Nexus needs per-release dists in Nexus
-# (simspace-jammy / simspace-noble) or a separate ng-apt-jammy repo; until then
-# jammy hosts stay on archive.ubuntu.com (via the mgmt proxy).
+# BLOCKED, by design. ng-apt is a single mixed-release repo: dist=simspace holds
+# jammy + noble + PLUCKY debs together. apt chooses by version across all of
+# them, and plucky's versions outrank both jammy and noble, so ANY apt pin that
+# makes ng-apt preferred pulls wrong-release packages and breaks dependency
+# resolution:
+#   * jammy (2026-10-16): apache2 on pp-proxy -> libc-bin needs libc6<2.36 but
+#     noble's libc6 2.43 is pulled.
+#   * noble (2026-10-16): malcolm prereqs -> a >1000 pin tries to DOWNGRADE
+#     python3-dotenv to the jammy 0.19.2 (the only one in ng-apt), dragging in
+#     jammy python3-ruamel.yaml.clib (python3<3.11) and plucky python3 3.13.
+# Even docker-ce cannot be sourced safely (plucky docker-ce is the highest
+# version). Sourcing apt from Nexus requires PER-RELEASE dists/repos in Nexus
+# (simspace-jammy / simspace-noble, or ng-apt-jammy / ng-apt-noble) -- see
+# PROJECT_LOG. Until that exists, every Ubuntu host uses archive.ubuntu.com (via
+# the mgmt proxy) and docker-ce uses download.docker.com.
 #
-# Imported by site.yml right after 10-mirror (controller-only) and before
-# 00-baseline. See roles/nexus_apt.
-- name: Nexus apt sourcing — prefer ng-apt on noble hosts
-  hosts: malcolm
-  gather_facts: true
-  become: true
-  roles:
-    - nexus_apt
-  tags:
-    - nexus_apt
-
-# Self-heal jammy hosts. The 2026-10-16 run wrote the ng-apt source + pin to the
-# jammy [linux] hosts before we learned the mixed-release repo breaks jammy apt;
-# strip it so their apt is back to archive.ubuntu.com only. Idempotent no-op on a
-# host that never had it (malcolm is not in [linux], so it is untouched here).
-- name: Nexus apt sourcing — ensure ng-apt is OFF jammy hosts (mixed-repo unsafe there)
-  hosts: linux
+# This play strips any ng-apt source/pin/proxy drop-in a prior (broken) run left
+# behind so apt is back to archive-only. Idempotent no-op on a clean host.
+- name: Remove any ng-apt apt source/pin from all managed Ubuntu hosts
+  hosts: linux:malcolm
   gather_facts: false
   become: true
   tags:
     - nexus_apt
   tasks:
-    - name: Remove any ng-apt source / pin / proxy drop-in
+    - name: Remove ng-apt source / pin / proxy drop-in if present
       ansible.builtin.file:
         path: "{{ item }}"
         state: absent
@@ -49,4 +40,8 @@
       ansible.builtin.apt:
         update_cache: true
         lock_timeout: 600
+      register: nexus_apt_update
+      until: nexus_apt_update is succeeded
+      retries: 3
+      delay: 10
       when: nexus_apt_cleanup is changed
