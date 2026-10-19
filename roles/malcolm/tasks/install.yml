@@ -128,3 +128,14 @@
     regexp: 'image: {{ malcolm_image_registry_default | regex_escape }}/'
     replace: "image: {{ malcolm_image_registry }}/"
   when: malcolm_image_registry != malcolm_image_registry_default
+
+# NEXUS SOURCING: the compose MUST keep ghcr.io image refs (control.py's
+# keystore_op greps for 'image: ghcr.io/idaholab/malcolm/<svc>'). If a prior run
+# rewrote them to the Nexus registry, put them back to ghcr.io; images.yml then
+# pulls from Nexus and retags to the ghcr.io names.
+- name: Restore ghcr.io image refs in the compose (undo any Nexus rewrite)
+  ansible.builtin.replace:
+    path: "{{ malcolm_install_dir }}/docker-compose.yml"
+    regexp: 'image: {{ malcolm_image_pull_registry | regex_escape }}/'
+    replace: "image: {{ malcolm_image_registry_default }}/"
+  when: malcolm_image_pull_registry | length > 0

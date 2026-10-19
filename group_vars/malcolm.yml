@@ -27,7 +27,9 @@ docker_engine_use_nexus_apt: false
 # The Nexus docker registry uses an internal CA, so dockerd must treat it as an
 # insecure-registry to pull from it. Keep the role's log defaults alongside.
 malcolm_source_artifact_url: "https://nexus.dev.ng.simspace.lan/repository/ng_raw/installers/malcolm/source/Malcolm-cisagov-26.08.0-07bbccdfe.tar.gz"
-malcolm_image_registry: "nexus-docker.dev.ng.simspace.lan/idaholab/malcolm"
+# Pull images FROM the Nexus registry and retag to ghcr.io locally (the compose
+# stays ghcr.io so Malcolm's control.py keystore_op works). NOT a compose rewrite.
+malcolm_image_pull_registry: "nexus-docker.dev.ng.simspace.lan/idaholab/malcolm"
 docker_engine_daemon_config:
   log-driver: json-file
   log-opts:

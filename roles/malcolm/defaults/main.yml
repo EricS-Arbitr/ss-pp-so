@@ -20,6 +20,16 @@ malcolm_source_artifact_url: ""
 malcolm_image_registry_default: ghcr.io/idaholab/malcolm
 malcolm_image_registry: "{{ malcolm_image_registry_default }}"
 
+# NEXUS SOURCING: when set, Malcolm's images are PULLED from this registry and
+# retagged locally to their ghcr.io names, rather than pulled from ghcr.io. The
+# compose refs are deliberately kept at ghcr.io -- Malcolm's own control.py
+# hardcodes `image: ghcr.io/idaholab/malcolm/<svc>` when it greps the compose to
+# create the opensearch keystore (keystore_op), so rewriting the refs to another
+# registry makes keystore creation fail and the stack never starts. Empty = pull
+# straight from ghcr.io as normal. (dockerd must trust this registry -- see the
+# insecure-registries / proxy settings where this is enabled.)
+malcolm_image_pull_registry: ""
+
 # --- Install -----------------------------------------------------------------
 # All of Malcolm's data paths are relative to this directory, so put it on the
 # data disk.
