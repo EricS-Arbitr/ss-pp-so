@@ -22,8 +22,14 @@ RemainAfterExit=yes
 User={{ malcolm_user }}
 Group={{ malcolm_group }}
 WorkingDirectory={{ malcolm_install_dir }}
-ExecStart=/usr/bin/python3 {{ malcolm_install_dir }}/scripts/control.py --start --quiet
-ExecStop=/usr/bin/python3 {{ malcolm_install_dir }}/scripts/control.py --stop --quiet
+# --profile malcolm is REQUIRED, not optional: control.py's --profile defaults to
+# None, and start() only creates the opensearch keystore (which the compose
+# bind-mounts, and which must exist before the opensearch container starts) when
+# args.composeProfile == PROFILE_MALCOLM. Without it the keystore is never
+# generated and `docker compose up` dies on the missing bind source
+# (opensearch/opensearch.keystore). Matches malcolm_compose's own profile.
+ExecStart=/usr/bin/python3 {{ malcolm_install_dir }}/scripts/control.py --start --quiet --profile malcolm
+ExecStop=/usr/bin/python3 {{ malcolm_install_dir }}/scripts/control.py --stop --quiet --profile malcolm
 TimeoutStartSec={{ malcolm_service_start_timeout }}
 TimeoutStopSec={{ malcolm_service_stop_timeout }}
 

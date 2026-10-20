@@ -115,3 +115,61 @@ Cleanup in `ss-pp-ab`:
 - Latest size: ~185K
 - Contents: 51 host_vars, 5 group_vars, 29 roles, hosts, playbooks/00-baseline.yml, deploy.sh
 - Excluded by design: `UPSTREAM_FIXES.md`, `PROJECT_LOG.md` (local docs)
+
+## 2026-10-15 · Branch `nexus-sourcing` — source artifacts from the in-platform Nexus
+
+Transitioned externally-sourced artifacts off the internet (reached via the mgmt
+proxy) onto the in-platform SimSpace Nexus, driven by the filled-in
+`ss-pp-so-nexus-locations` worksheet. Nexus is reachable ONLY through the mgmt
+proxy and presents an internal-CA cert, so every Nexus fetch keeps the proxy and
+skips TLS verification (`--ignore-certs` / `validate_certs: false` /
+`--src-tls-verify=false` / apt `Verify-Peer false`). All changes are
+backward-compatible: an empty source var restores the original github/ghcr path.
+
+Transitioned:
+- **Galaxy** — `requirements.yml` now lists all 9 collections as Nexus `ng_raw/galaxy`
+  tarball URLs; `deploy.sh` installs with `--ignore-certs`.
+- **SO source** — `so_apt_mirror` downloads the pinned source tarball from Nexus
+  when `so_source_artifact_url` is set (gates the github clone).
+- **SO airgap content** (resources/yara/playbooks) — Nexus tarballs when
+  `so_airgap_artifact_base` is set (gates the github clones). `so_manager` now
+  extracts each content repo with `--strip-components=1` into `item.dest`, so the
+  tarball's top-dir name is irrelevant — the Nexus `securityonion-yara` tarball is
+  a GitHub-archive (`securityonion-yara-<sha>/`), which the old
+  extract-into-parent approach landed at the wrong path (deploy failure
+  2026-10-16: `/nsm/rules/detect-yara/repos/securityonion-yara` missing).
+- **SO container images** — `build_so_registry.sh.j2` pulls from `so_registry_source`
+  (set to the Nexus docker registry) instead of ghcr.io; on-range registry served
+  to the grid is unchanged.
+- **Malcolm** — pin reverted **26.09.0 → 26.08.0** (the original version, which is
+  what Nexus holds; owner decision 2026-10-15). Source now unpacked from the Nexus
+  `ng_raw` tarball (`malcolm_source_artifact_url`, gates the github clone); images
+  pulled from the Nexus docker registry (`malcolm_image_registry` →
+  `nexus-docker…/idaholab/malcolm`, tag 26.08.0), with `nexus-docker` added to
+  dockerd `insecure-registries` for its internal CA. All 26.08.0 artifacts verified
+  present in Nexus. (NB: vCity/Repos `pins.env` still says Malcolm 26.09.0 — reconcile
+  the cache spec if the cache should match this branch.)
+
+- **Base Ubuntu apt + Docker CE — NOT transitioned (BLOCKED).** Attempted a
+  `nexus_apt` role (ng-apt source + priority pin) but `ng-apt` is a single
+  **mixed-release** repo (dist=simspace holds jammy + noble + **plucky** debs).
+  apt chooses by version across all three and plucky outranks the rest, so any pin
+  preferring ng-apt pulls wrong-release packages and breaks dependency resolution —
+  proven twice 2026-10-16: jammy (`apache2` on `pp-proxy` → `libc-bin` needs
+  `libc6<2.36`) and noble (malcolm prereqs → a >1000 pin tries to downgrade
+  `python3-dotenv` to jammy `0.19.2`, dragging in jammy `ruamel.yaml.clib`
+  (`python3<3.11`) and plucky `python3 3.13`). Even docker-ce is unsafe (plucky
+  docker-ce is the highest version). **Reverted:** `nexus_apt` role deleted;
+  `playbooks/12-nexus-apt.yml` is now a cleanup play that strips any ng-apt config a
+  prior run left; `docker_engine_use_nexus_apt: false` (back to download.docker.com).
+  Every Ubuntu host stays on archive.ubuntu.com via the mgmt proxy.
+  **To source apt from Nexus → needs PER-RELEASE dists/repos** (simspace-jammy /
+  simspace-noble, or ng-apt-jammy / ng-apt-noble). The uploaded FINAL debs are fine
+  but cannot be consumed from a mixed-release dist.
+- **PyPI** (billing_site) — pip installs Flask/Werkzeug/gunicorn + closure from
+  `ng_pypi` (`billing_pip_extra_args` = `--index-url …/ng_pypi/simple --trusted-host`),
+  all 11 wheels verified present in Nexus.
+
+NOT transitioned (deliberate):
+- **so-setup upstream** (repo.securityonion.net, Elastic) — no Nexus location; unchanged.
+- **Windows/EDR/CA, wordpress/mariadb** — already Nexus-sourced; no change.

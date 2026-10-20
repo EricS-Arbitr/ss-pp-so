@@ -5,6 +5,25 @@
   register: malcolm_images
   changed_when: false
 
+# NEXUS SOURCING: the compose references ghcr.io (required by control.py). Pull
+# each image from the Nexus docker registry and retag it to its ghcr.io name, so
+# compose/control.py find it locally with no internet pull. Idempotent: skips an
+# image already present under its ghcr.io tag. dockerd reaches Nexus via the proxy
+# drop-in and trusts it via insecure-registries (both set by docker_engine).
+- name: Pull Malcolm images from Nexus and retag to their ghcr.io names
+  ansible.builtin.shell:
+    cmd: |
+      set -e
+      if docker image inspect {{ item | quote }} >/dev/null 2>&1; then exit 0; fi
+      src={{ (item | replace(malcolm_image_registry_default + '/', malcolm_image_pull_registry + '/')) | quote }}
+      docker pull "$src"
+      docker tag "$src" {{ item | quote }}
+  loop: "{{ malcolm_images.stdout_lines | unique }}"
+  loop_control:
+    label: "{{ item }}"
+  when: malcolm_image_pull_registry | length > 0
+  changed_when: true
+
 - name: Check which images are already present
   ansible.builtin.command:
     cmd: docker image inspect --format ok {{ item }}

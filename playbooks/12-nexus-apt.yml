@@ -1,0 +1,47 @@
+---
+# 12-nexus-apt.yml — ensure NO managed Ubuntu host carries the ng-apt apt source.
+#
+# BLOCKED, by design. ng-apt is a single mixed-release repo: dist=simspace holds
+# jammy + noble + PLUCKY debs together. apt chooses by version across all of
+# them, and plucky's versions outrank both jammy and noble, so ANY apt pin that
+# makes ng-apt preferred pulls wrong-release packages and breaks dependency
+# resolution:
+#   * jammy (2026-10-16): apache2 on pp-proxy -> libc-bin needs libc6<2.36 but
+#     noble's libc6 2.43 is pulled.
+#   * noble (2026-10-16): malcolm prereqs -> a >1000 pin tries to DOWNGRADE
+#     python3-dotenv to the jammy 0.19.2 (the only one in ng-apt), dragging in
+#     jammy python3-ruamel.yaml.clib (python3<3.11) and plucky python3 3.13.
+# Even docker-ce cannot be sourced safely (plucky docker-ce is the highest
+# version). Sourcing apt from Nexus requires PER-RELEASE dists/repos in Nexus
+# (simspace-jammy / simspace-noble, or ng-apt-jammy / ng-apt-noble) -- see
+# PROJECT_LOG. Until that exists, every Ubuntu host uses archive.ubuntu.com (via
+# the mgmt proxy) and docker-ce uses download.docker.com.
+#
+# This play strips any ng-apt source/pin/proxy drop-in a prior (broken) run left
+# behind so apt is back to archive-only. Idempotent no-op on a clean host.
+- name: Remove any ng-apt apt source/pin from all managed Ubuntu hosts
+  hosts: linux:malcolm
+  gather_facts: false
+  become: true
+  tags:
+    - nexus_apt
+  tasks:
+    - name: Remove ng-apt source / pin / proxy drop-in if present
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/apt/sources.list.d/nexus.list
+        - /etc/apt/preferences.d/99-nexus-ng-apt
+        - /etc/apt/apt.conf.d/99nexus
+      register: nexus_apt_cleanup
+
+    - name: Refresh apt cache after removing ng-apt # noqa: no-handler
+      ansible.builtin.apt:
+        update_cache: true
+        lock_timeout: 600
+      register: nexus_apt_update
+      until: nexus_apt_update is succeeded
+      retries: 3
+      delay: 10
+      when: nexus_apt_cleanup is changed

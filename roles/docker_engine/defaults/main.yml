@@ -1,3 +1,11 @@
+# NEXUS SOURCING (2026-10-15): when true, install Docker CE from the in-platform
+# Nexus apt repo (ng-apt) instead of download.docker.com -- the download.docker.com
+# key + repo are skipped and docker-ce/-cli/containerd.io/buildx/compose come from
+# ng-apt. The ng-apt source itself is configured by the `nexus_apt` role (single
+# owner), which must run on the host first. Set per-host/group (e.g.
+# group_vars/malcolm.yml). ss-pp-so runs nexus_apt on linux:malcolm early in site.yml.
+docker_engine_use_nexus_apt: false
+
 # Docker's upstream apt repo. Point these at a local mirror for air-gapped use.
 docker_engine_repo_url: https://download.docker.com/linux/ubuntu
 docker_engine_gpg_key_url: "{{ docker_engine_repo_url }}/gpg"

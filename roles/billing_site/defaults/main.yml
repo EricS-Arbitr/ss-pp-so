@@ -1,0 +1,8 @@
+# NEXUS SOURCING (2026-10-15): install the billing deps (Flask/Werkzeug/gunicorn
+# + closure) from the in-platform Nexus PyPI repo (ng_pypi) instead of pypi.org.
+# Nexus is reached via the mgmt proxy (set in the play environment) and presents
+# an internal-CA cert, so --trusted-host skips cert verification for it. Set to
+# "" to fall back to pip's default index (pypi.org via the proxy).
+billing_pip_extra_args: >-
+  --index-url https://nexus.dev.ng.simspace.lan/repository/ng_pypi/simple
+  --trusted-host nexus.dev.ng.simspace.lan

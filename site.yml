@@ -47,6 +47,12 @@
 # Mirror first — see ORDERING above. Starts the long download, then returns.
 - import_playbook: playbooks/10-mirror.yml
 
+# NEXUS SOURCING: point every managed Ubuntu host at the in-platform Nexus apt
+# repo (ng-apt) BEFORE the baseline's first apt install, so role package installs
+# come from Nexus (pinned above archive.ubuntu.com) instead of the internet.
+# 10-mirror runs on the controller only, so nothing here depends on it.
+- import_playbook: playbooks/12-nexus-apt.yml
+
 - import_playbook: playbooks/00-baseline.yml
 
 # Windows clocks read the UTC RTC as local time, so every Windows host runs

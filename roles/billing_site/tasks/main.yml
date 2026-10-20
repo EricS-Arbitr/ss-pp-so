@@ -50,10 +50,11 @@
     creates: /opt/billing/venv/bin/activate
   become_user: simspace
 
-- name: Install Flask + Werkzeug + gunicorn into virtualenv (via corp proxy)
+- name: Install Flask + Werkzeug + gunicorn into virtualenv (from Nexus ng_pypi via proxy)
   ansible.builtin.pip:
     requirements: /opt/billing/app/requirements.txt
     virtualenv: /opt/billing/venv
+    extra_args: "{{ billing_pip_extra_args | default('') }}"
   become_user: simspace
   environment:
     HTTP_PROXY:  "http://{{ inet_proxy_addr }}:{{ inet_proxy_port }}"

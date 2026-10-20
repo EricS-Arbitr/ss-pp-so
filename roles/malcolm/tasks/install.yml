@@ -44,12 +44,40 @@
 # "'origin' does not appear to be a git repository". git's own --branch takes a
 # tag for a shallow clone. `creates` makes it idempotent; git clones into the
 # (absent or empty) dest, and the chown below hands the tree to the Malcolm user.
+# NEXUS SOURCING: when malcolm_source_artifact_url is set, download + unpack the
+# pinned Malcolm source tarball from Nexus (ng_raw) instead of cloning github.
+# The tarball is contents-at-root (docker-compose.yml at top), so no
+# strip-components. Reached via the proxy; internal CA so validate_certs is off.
+# Idempotent via `creates`. (No .git here, so `creates` keys on docker-compose.yml.)
+- name: Ensure the Malcolm install dir exists (for the Nexus unpack)
+  ansible.builtin.file:
+    path: "{{ malcolm_install_dir }}"
+    state: directory
+    mode: "0755"
+  when: malcolm_source_artifact_url | length > 0
+
+- name: Fetch + unpack the Malcolm source from Nexus (when malcolm_source_artifact_url set)
+  ansible.builtin.unarchive:
+    src: "{{ malcolm_source_artifact_url }}"
+    dest: "{{ malcolm_install_dir }}"
+    remote_src: true
+    validate_certs: false
+    creates: "{{ malcolm_install_dir }}/docker-compose.yml"
+  environment:
+    http_proxy: "{{ malcolm_proxy }}"
+    https_proxy: "{{ malcolm_proxy }}"
+    HTTP_PROXY: "{{ malcolm_proxy }}"
+    HTTPS_PROXY: "{{ malcolm_proxy }}"
+  register: malcolm_source_nexus
+  when: malcolm_source_artifact_url | length > 0
+
 - name: Clone the Malcolm source at the pinned release tag (shallow, via proxy)  # noqa: command-instead-of-module
   ansible.builtin.command:
     cmd: "git clone --depth 1 --branch {{ malcolm_repo_version }} {{ malcolm_repo_url }} {{ malcolm_install_dir }}"
     creates: "{{ malcolm_install_dir }}/.git"
   register: malcolm_clone
   changed_when: true
+  when: malcolm_source_artifact_url | length == 0
 
 - name: Ensure the install tree is owned by the Malcolm user
   ansible.builtin.file:
@@ -58,7 +86,9 @@
     owner: "{{ malcolm_user }}"
     group: "{{ malcolm_group }}"
     recurse: true
-  when: malcolm_clone is changed
+  when: >-
+    (malcolm_clone is defined and malcolm_clone is changed) or
+    (malcolm_source_nexus is defined and malcolm_source_nexus is changed)
 
 # control.py runs as the malcolm user and chdirs into the install dir. The
 # system malcolm user must be able to traverse every parent, including the
@@ -98,3 +128,14 @@
     regexp: 'image: {{ malcolm_image_registry_default | regex_escape }}/'
     replace: "image: {{ malcolm_image_registry }}/"
   when: malcolm_image_registry != malcolm_image_registry_default
+
+# NEXUS SOURCING: the compose MUST keep ghcr.io image refs (control.py's
+# keystore_op greps for 'image: ghcr.io/idaholab/malcolm/<svc>'). If a prior run
+# rewrote them to the Nexus registry, put them back to ghcr.io; images.yml then
+# pulls from Nexus and retags to the ghcr.io names.
+- name: Restore ghcr.io image refs in the compose (undo any Nexus rewrite)
+  ansible.builtin.replace:
+    path: "{{ malcolm_install_dir }}/docker-compose.yml"
+    regexp: 'image: {{ malcolm_image_pull_registry | regex_escape }}/'
+    replace: "image: {{ malcolm_image_registry_default }}/"
+  when: malcolm_image_pull_registry | length > 0

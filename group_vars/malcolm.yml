@@ -12,6 +12,32 @@ malcolm_proxy: "http://{{ inet_proxy_addr }}:{{ inet_proxy_port }}"
 malcolm_no_proxy: "localhost,127.0.0.1"
 docker_engine_proxy: "{{ malcolm_proxy }}"
 
+# Docker CE from download.docker.com (via the proxy), NOT ng-apt. ng-apt is a
+# single mixed-release repo (jammy+noble+plucky) and plucky's docker-ce outranks
+# noble's, so an apt pin preferring ng-apt pulls the wrong release and breaks
+# dependency resolution (proven on this noble host 2026-10-16). Sourcing docker-ce
+# from Nexus needs per-release apt repos; until then it stays on download.docker.com.
+docker_engine_use_nexus_apt: false
+
+# NEXUS SOURCING: Malcolm 26.08.0 source + images from Nexus. (These are a raw
+# tarball + a docker registry, NOT apt, so the mixed-release apt problem above
+# does not apply.)
+#   - source tarball from ng_raw (unpacked into the install dir; gates the clone)
+#   - image_registry rewrites the compose refs to the Nexus docker registry
+# The Nexus docker registry uses an internal CA, so dockerd must treat it as an
+# insecure-registry to pull from it. Keep the role's log defaults alongside.
+malcolm_source_artifact_url: "https://nexus.dev.ng.simspace.lan/repository/ng_raw/installers/malcolm/source/Malcolm-cisagov-26.08.0-07bbccdfe.tar.gz"
+# Pull images FROM the Nexus registry and retag to ghcr.io locally (the compose
+# stays ghcr.io so Malcolm's control.py keystore_op works). NOT a compose rewrite.
+malcolm_image_pull_registry: "nexus-docker.dev.ng.simspace.lan/idaholab/malcolm"
+docker_engine_daemon_config:
+  log-driver: json-file
+  log-opts:
+    max-size: 50m
+    max-file: "3"
+  insecure-registries:
+    - nexus-docker.dev.ng.simspace.lan
+
 # Let the image's xadmin run docker directly.
 docker_engine_users:
   - xadmin

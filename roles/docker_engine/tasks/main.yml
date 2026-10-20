@@ -17,6 +17,10 @@
     cache_valid_time: 3600
     lock_timeout: "{{ docker_engine_apt_lock_timeout }}"
 
+# NEXUS SOURCING: when docker_engine_use_nexus_apt is true, docker-ce installs
+# from the in-platform ng-apt repo and the download.docker.com key + repo below
+# are skipped. The ng-apt source itself is configured by the `nexus_apt` role
+# (single owner), which runs on this host before docker_engine.
 - name: Create apt keyrings directory
   ansible.builtin.file:
     path: "{{ docker_engine_keyring | dirname }}"
@@ -24,6 +28,7 @@
     owner: root
     group: root
     mode: "0755"
+  when: not docker_engine_use_nexus_apt | bool
 
 - name: Download Docker apt signing key
   ansible.builtin.get_url:
@@ -33,6 +38,7 @@
     group: root
     mode: "0644"
   register: docker_engine_key
+  when: not docker_engine_use_nexus_apt | bool
 
 - name: Add Docker apt repository
   ansible.builtin.template:
@@ -42,12 +48,16 @@
     group: root
     mode: "0644"
   register: docker_engine_repo
+  when: not docker_engine_use_nexus_apt | bool
 
 - name: Refresh apt cache after repo change # noqa: no-handler
   ansible.builtin.apt:
     update_cache: true
     lock_timeout: "{{ docker_engine_apt_lock_timeout }}"
-  when: docker_engine_key is changed or docker_engine_repo is changed
+  when: >-
+    (docker_engine_key.changed | default(false)) or
+    (docker_engine_repo.changed | default(false)) or
+    (docker_engine_use_nexus_apt | bool)
 
 - name: Install Docker Engine and Compose plugin
   ansible.builtin.apt:
