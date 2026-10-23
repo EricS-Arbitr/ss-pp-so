@@ -32,7 +32,7 @@ parsed into their own datasets — so correlating a proxy request with the
 process that made it and the firewall rule that allowed it is one investigation,
 not three.
 
-**Six analyst positions plus a forensics bench** — SIFT and REMnux on the same segment — with tooling ready — and
+**Six FLARE-imaged analyst positions plus a forensics bench** — SIFT and REMnux on the same segment — with tooling ready — and
 deliberately excluded from the emulated-user population, so an analyst's own
 activity never contaminates the host they investigate from.
 

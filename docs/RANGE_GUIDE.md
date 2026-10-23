@@ -113,7 +113,7 @@ graph TB
 | Legal | 172.16.5.0/24 | 6 workstations |
 | InfoSec | 172.16.6.0/24 | 4 workstations |
 | DMZ | 172.16.8.0/24 | `pp-www`, `pp-dmz-dns` |
-| Security | 172.16.9.0/24 | SO grid, 6 hunt workstations, 3 forensics VMs |
+| Security | 172.16.9.0/24 | SO grid, 6 hunt workstations, 2 forensics VMs |
 | OT-Ctrl | 192.168.100.0/24 | `pp-dc03`, `pp-dcs-ctrl`, `pp-ctl-wks-01..04` |
 | Gas-Turbine | 192.168.95.0/24 | Plant equipment |
 | Gas-Turbine-Sim | 192.168.90.0/27 | Simulation |
@@ -335,9 +335,11 @@ through `pp-ot-firewall`. Reach it from a hunt workstation at
 
 ## The analyst environment
 
-Six Windows 10 workstations on the security segment — `win-hunt-1` through
-`win-hunt-6`, `172.16.9.11–16` — with Chrome and autologin, positioned to reach
-the SOC interface directly.
+Six FLARE-imaged Windows workstations on the security segment — `win-hunt-1`
+through `win-hunt-6`, `172.16.9.11–16` — with Chrome and autologin, positioned
+to reach the SOC interface directly. The FLARE image gives analysts the
+reverse-engineering and malware-analysis toolset at the hunt position itself,
+which is where the range's Windows malware-analysis capability now lives.
 
 They are **not** in the `[aue]` group and run no emulated users, so analyst
 activity is not mixed with synthetic user activity on the hosts analysts work
