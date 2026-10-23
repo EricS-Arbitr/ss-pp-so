@@ -466,7 +466,6 @@ pp-proxy
 #              the same argument recorded for [hunt] above. Not yet
 #              enrolled: see the note below.
 #   pp-remnux  detonation host -> [unmanaged], not enrolled
-#   pp-flare   detonation host -> [unmanaged], not enrolled
 #
 # TO ENROL pp-sift, three things are needed and none are assumed here:
 #   1. host_vars/pp-sift.yml with ansible_host and working credentials --
@@ -478,11 +477,10 @@ pp-proxy
 #      host, not for a vendor forensics appliance.
 #   3. adding `forensics` to the enrol pattern in playbooks/75-endpoint.yml
 #      (`windows:linux:!unmanaged:!so_all`), which then picks up pp-sift and
-#      still excludes the two detonation hosts via [unmanaged].
+#      still excludes the detonation host via [unmanaged].
 [forensics]
 pp-sift
 pp-remnux
-pp-flare
 
 # ------------------------------------------------------------
 # Unmanaged systems — hard-coded, NOT targeted by any Ansible play.
@@ -496,16 +494,15 @@ pp-gasvibsens
 pp-ot-hist
 pp-engws
 elgg
-# Malware analysis hosts, added 2026-09-01. DELIBERATELY unmanaged, and the
-# reason is telemetry rather than configuration: both exist to execute
+# Malware analysis host, added 2026-09-01. DELIBERATELY unmanaged, and the
+# reason is telemetry rather than configuration: it exists to execute
 # malware. Sysmon and Elastic Agent on a detonation box emit process trees,
 # network connections and file writes that are indistinguishable from an
-# intrusion -- because they are one, just an authorised one. Enrolling them
+# intrusion -- because they are one, just an authorised one. Enrolling it
 # would feed instructor activity into the SIEM students are hunting in.
 # playbooks/75-endpoint.yml excludes [unmanaged], so this placement is what
-# keeps them out; no play change is needed.
+# keeps it out; no play change is needed.
 pp-remnux
-pp-flare
 
 [aue]
 pp-bp-wkstn-1
