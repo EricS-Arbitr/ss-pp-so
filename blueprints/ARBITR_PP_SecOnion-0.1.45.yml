@@ -532,7 +532,7 @@ resources:
     cwd: "/etc/ansible"
     user: "root"
     content: "wget --no-check-certificate -e use_proxy=yes -e https_proxy=10.255.240.1:3128\
-      \ -O /etc/ansible/ab_pp.tgz  https://raw.githubusercontent.com/EricS-Arbitr/ss-pp-so/3aaad199f6fb31e2a1c8648380216ff7023afcff/ab_pp.tgz\
+      \ -O /etc/ansible/ab_pp.tgz  https://raw.githubusercontent.com/EricS-Arbitr/ss-pp-so/2c529c6b860f6e909236e192d99d2f049b6e3feb/ab_pp.tgz\
       \ && tar -xvzf ab_pp.tgz\n"
     scriptType: "BASH"
 - type: "range.resource.primitive.VmInstance::1.0.0"
