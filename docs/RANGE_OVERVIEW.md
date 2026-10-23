@@ -8,7 +8,7 @@ Most SIEM training environments treat the network as a backdrop. Logs arrive,
 analysts triage them, and nothing an attacker does is constrained by where they
 are.
 
-**Voltgrid is built the other way round.** A 74-host power utility with a real
+**Voltgrid is built the other way round.** A 72-host power utility with a real
 Active Directory forest, a real DMZ, and a genuinely segmented OT enclave
 running gas-turbine plant equipment. Three Security Onion sensors watch it from
 three different vantage points — and *which sensor sees an event tells you
@@ -51,7 +51,7 @@ one that stops in the DMZ.
 ## What instructors get
 
 **Two attack paths, usable together.** A Kali workstation for manual red team
-operations, and scripted attack emulation targeting seven high-value hosts
+operations, and scripted attack emulation targeting six high-value hosts
 spanning both sides of the firewall boundary. Start automated, continue by
 hand; the defender's view does not change shape.
 
@@ -70,7 +70,7 @@ up, run the exercise, rebuild it clean.
 
 | | |
 |---|---|
-| **Scale** | 75 hosts across 13 host-bearing segments, plus 7 point-to-point transit links |
+| **Scale** | 72 hosts across 13 host-bearing segments, plus 7 point-to-point transit links |
 | **Identity** | `voltgrid.com` — three domain controllers, 40 domain members, 32 emulated users |
 | **Corporate** | Services, Business Processing, Engineering, Legal, InfoSec |
 | **Perimeter** | DMZ with public web, DNS and mail; simulated Internet beyond |

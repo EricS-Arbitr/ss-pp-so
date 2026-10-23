@@ -15,7 +15,7 @@ is the only SIEM; every log source on the range reports to it.
 
 | | |
 |---|---|
-| **Hosts** | 74 |
+| **Hosts** | 72 |
 | **AD forest** | `voltgrid.com`, three domain controllers, 40 domain members |
 | **Corporate segments** | Services, Business Processing, Engineering, Legal, InfoSec |
 | **OT enclave** | Four segments behind a dedicated firewall — control, turbine, turbine-sim, OT services |
@@ -404,9 +404,9 @@ work. Everything it does crosses `pp-isp-router` and is therefore carried by
 
 **Attack emulation** — SimSpace's platform driving scripted activity against
 the `[ae]` hosts: `pp-dc01`, `pp-dc02`, `pp-dc03`, `pp-file`, `pp-sql`,
-`pp-mail`, `pp-dcs-ctrl`. Note the mix — two corporate DCs, the file and
-database servers, mail, and the OT control station. The target set spans the
-firewall boundary on purpose.
+`pp-dcs-ctrl`. Note the mix — two corporate DCs, the file and database servers,
+and the OT control station. The target set spans the firewall boundary on
+purpose.
 
 Both paths produce telemetry through the same sensors and the same Fleet
 agents, so a scenario can begin automated and continue manually without the
