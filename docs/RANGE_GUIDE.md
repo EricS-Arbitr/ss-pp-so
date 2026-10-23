@@ -16,7 +16,7 @@ is the only SIEM; every log source on the range reports to it.
 | | |
 |---|---|
 | **Hosts** | 72 |
-| **AD forest** | `voltgrid.com`, three domain controllers, 40 domain members |
+| **AD forest** | `voltgrid.com`, three domain controllers, 39 domain members |
 | **Corporate segments** | Services, Business Processing, Engineering, Legal, InfoSec |
 | **OT enclave** | Four segments behind a dedicated firewall — control, turbine, turbine-sim, OT services |
 | **SIEM** | Security Onion 2.4 distributed — manager, search node, three sensors |
@@ -48,8 +48,8 @@ OT reaches corporate over static routes only. `pp-dc03` sits inside the enclave
 so OT hosts authenticate locally, which means routine identity traffic does not
 cross the boundary.
 
-**Endpoint telemetry is not uniform.** 42 of 45 Windows hosts run Sysmon. The
-three exclusions are deliberate and documented in `hosts`.
+**Endpoint telemetry is not uniform.** 41 of 43 Windows hosts run Sysmon. The
+two exclusions are deliberate and documented in `hosts`.
 
 **The network is not quiet.** 32 emulated users generate browsing, file and
 process activity continuously across the corporate segments. Detection logic
@@ -69,11 +69,11 @@ graph TB
   subgraph EDGE["Edge"]
     ISPR["pp-isp-router"]
     EXTFW["pp-external-firewall"]
-    DMZ["DMZ 172.16.8.0/24<br/>www · dns · smtp"]
+    DMZ["DMZ 172.16.8.0/24<br/>www · dns"]
   end
   subgraph CORP["Corporate"]
     CORPR["pp-corp-router"]
-    SVC["Services 172.16.2.0/24<br/>dc01 · dc02 · sql · file · mail · proxy · syslog"]
+    SVC["Services 172.16.2.0/24<br/>dc01 · dc02 · sql · file · proxy · syslog"]
     DEPT["BP · Eng · Legal · InfoSec<br/>172.16.3-6.0/24"]
   end
   subgraph OT["OT enclave"]
@@ -107,12 +107,12 @@ graph TB
 
 | Segment | CIDR | Contents |
 |---|---|---|
-| Services | 172.16.2.0/24 | `pp-dc01`, `pp-dc02`, `pp-sql`, `pp-file`, `pp-mail`, `pp-proxy`, `pp-syslog` |
+| Services | 172.16.2.0/24 | `pp-dc01`, `pp-dc02`, `pp-sql`, `pp-file`, `pp-proxy`, `pp-syslog` |
 | Business Processing | 172.16.3.0/24 | 8 workstations |
 | Engineering | 172.16.4.0/24 | 8 workstations |
 | Legal | 172.16.5.0/24 | 6 workstations |
 | InfoSec | 172.16.6.0/24 | 4 workstations |
-| DMZ | 172.16.8.0/24 | `pp-www`, `pp-dmz-dns`, `pp-dmz-smtp` |
+| DMZ | 172.16.8.0/24 | `pp-www`, `pp-dmz-dns` |
 | Security | 172.16.9.0/24 | SO grid, 6 hunt workstations, 3 forensics VMs |
 | OT-Ctrl | 192.168.100.0/24 | `pp-dc03`, `pp-dcs-ctrl`, `pp-ctl-wks-01..04` |
 | Gas-Turbine | 192.168.95.0/24 | Plant equipment |
@@ -150,7 +150,7 @@ against a DC that lives on their side of the firewall, so OT identity traffic
 does not routinely cross the boundary — which means when it *does*, that is a
 signal.
 
-40 hosts are domain members. Workstations run **emulated users** with real
+39 hosts are domain members. Workstations run **emulated users** with real
 identities (`charity.bowen`, `ahmed.ortega`, `david.miller` and 29 others) who
 log in, browse, open documents and generate the background traffic that makes
 detection non-trivial.
@@ -212,7 +212,7 @@ Traffic is copied from router interfaces into `gretap` tunnels with `tc mirred`.
 The management plane shares a data-plane interface on these routers, so each
 mirrored interface carries two `action pass` filters at lower priority than the
 `mirred` catch-all. On `pp-corp-router` that keeps the Services subnet
-(`pp-dc01`, `pp-dc02`, `pp-sql`, `pp-file`, `pp-mail`) in coverage while
+(`pp-dc01`, `pp-dc02`, `pp-sql`, `pp-file`) in coverage while
 excluding orchestration traffic that does not exist in-scenario.
 
 Verify with the absolute path — `tc` is not on the `vyos` user's PATH, and a
@@ -245,11 +245,10 @@ read from a single stream.
 ### Endpoint telemetry
 
 Elastic Agents on Windows and Linux endpoints enrol into SO's Fleet, so process
-and file activity sits alongside network evidence. **Sysmon runs on 42 of the
-45 Windows hosts**, driven by the `[sysmon]` inventory group. Three are
-excluded on purpose: `pp-dcs-ctrl` for the reason below, and `pp-dmz-dns` and
-`pp-dmz-smtp`, which sit outside the forest and outside the corporate telemetry
-contract.
+and file activity sits alongside network evidence. **Sysmon runs on 41 of the
+43 Windows hosts**, driven by the `[sysmon]` inventory group. Two are
+excluded on purpose: `pp-dcs-ctrl` for the reason below, and `pp-dmz-dns`,
+which sits outside the forest and outside the corporate telemetry contract.
 
 Coverage is a group rather than a host pattern so that "does this host produce
 endpoint telemetry" is a decision someone recorded, not a side effect of who
@@ -352,22 +351,21 @@ those hosts are monitored like any other endpoint.
 
 ## Forensics and malware analysis tooling
 
-Three analyst VMs on the security segment:
+Two analyst VMs on the security segment:
 
 | Host | Address | Purpose | Telemetry |
 |---|---|---|---|
 | `pp-sift` | 172.16.9.101 | SANS Investigative Forensic Toolkit — disk and memory analysis | none currently; a candidate for enrolment |
 | `pp-remnux` | 172.16.9.100 | Malware analysis (Linux) | **none, deliberately** |
-| `pp-flare` | 172.16.9.102 | Malware analysis (Windows) | **none, deliberately** |
 
-All three are in `[forensics]`, a label group no play targets. `pp-remnux` and
-`pp-flare` are additionally in `[unmanaged]`, which is what excludes them from
+Both are in `[forensics]`, a label group no play targets. `pp-remnux` is
+additionally in `[unmanaged]`, which is what excludes it from
 `75-endpoint.yml`.
 
-**Why the detonation hosts are not instrumented.** Sysmon and Elastic Agent on
+**Why the detonation host is not instrumented.** Sysmon and Elastic Agent on
 a box whose purpose is executing malware emit process trees, network
 connections and file writes indistinguishable from an intrusion — because they
-are one, just an authorised one. Enrolling them would feed instructor activity
+are one, just an authorised one. Enrolling it would feed instructor activity
 into the SIEM students are hunting in, producing the most convincing false
 positives available. `pp-sift` is the opposite case: it analyses evidence,
 executes nothing hostile, and holds the investigation's work product, which
@@ -376,13 +374,13 @@ the three prerequisites.
 
 ### Adjacency — read before running live samples
 
-`pp-remnux` and `pp-flare` share layer 2 with `so-manager`, `so-search`, all
+`pp-remnux` shares layer 2 with `so-manager`, `so-search`, all
 three sensors and the six hunt workstations. A sample with
 worm-like behaviour reaches every one of them **without traversing a router**,
 so no firewall rule or routing change constrains it.
 
 This is acceptable for static analysis — strings, unpacking, disassembly,
-memory forensics — which is how these hosts are expected to be used. It is
+memory forensics — which is how it is expected to be used. It is
 **not** acceptable for uncontrolled detonation. If live execution becomes part
 of exercise design, the correct fix is a dedicated analysis subnet behind
 `pp-internal-firewall` with no path to `pp-security`; nothing short of a
@@ -487,7 +485,7 @@ the tunnel is carrying the wrong frame type. Both ends must be `gretap`.
 | `tcpdump -i tun0` on each sensor | packets flowing |
 | Zeek `conn.log` | connection records, not zero |
 | Fleet | every endpoint enrolled |
-| Domain membership | 40 hosts joined to `voltgrid.com` |
+| Domain membership | 39 hosts joined to `voltgrid.com` |
 
 ---
 
@@ -567,7 +565,6 @@ until timeout and looks like an unbooted host.
 | `pp-dc03` | 192.168.100.5 | OT-Ctrl | additional_dc |
 | `pp-dcs-ctrl` | 192.168.100.10 | OT-Ctrl | ot_servers |
 | `pp-dmz-dns` | 172.16.8.4 | DMZ | dmz |
-| `pp-dmz-smtp` | 172.16.8.3 | DMZ | dmz |
 | `pp-eng-wkstn-1` | 172.16.4.10 | Engineering | workstation / member |
 | `pp-eng-wkstn-2` | 172.16.4.3 | Engineering | workstation / member |
 | `pp-eng-wkstn-3` | 172.16.4.4 | Engineering | workstation / member |
@@ -579,7 +576,6 @@ until timeout and looks like an unbooted host.
 | `pp-engws` | — | — | unmanaged |
 | `pp-external-firewall` | 10.255.240.191 | — | pfsense |
 | `pp-file` | 172.16.2.3 | Services | file |
-| `pp-flare` | 172.16.9.102 | Security | forensics |
 | `pp-gas-sim` | — | — | unmanaged |
 | `pp-gasplant-plc` | — | — | unmanaged |
 | `pp-gasvibsens` | — | — | unmanaged |
@@ -596,9 +592,9 @@ until timeout and looks like an unbooted host.
 | `pp-ls-wkstn-4` | 172.16.5.5 | Legal | workstation / member |
 | `pp-ls-wkstn-5` | 172.16.5.6 | Legal | workstation / member |
 | `pp-ls-wkstn-6` | 172.16.5.7 | Legal | workstation / member |
-| `pp-mail` | 172.16.2.5 | Services | workstation / member |
 | `pp-ot-firewall` | 10.255.240.190 | — | pfsense |
 | `pp-ot-hist` | — | — | unmanaged |
+| `pp-ot-malcolm` | 192.168.90.130 | OT-DMZ | malcolm |
 | `pp-ot-router` | 192.168.200.202 | — | vyos_routes_only |
 | `pp-proxy` | 172.16.2.20 | Services | proxy |
 | `pp-remnux` | 172.16.9.100 | Security | forensics |

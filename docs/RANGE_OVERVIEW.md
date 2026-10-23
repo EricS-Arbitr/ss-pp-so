@@ -23,7 +23,7 @@ reconstructs from evidence.
 
 **A SIEM watching a real network.** Security Onion 2.4, distributed across a
 manager, a search node and three sensors. Suricata and Zeek on every mirrored
-segment. Elastic Agent on 42 Windows endpoints feeding process and file
+segment. Elastic Agent on 43 Windows endpoints feeding process and file
 telemetry into the same platform.
 
 **One place to look.** Network evidence, endpoint telemetry, web and proxy
@@ -32,7 +32,7 @@ parsed into their own datasets — so correlating a proxy request with the
 process that made it and the firewall rule that allowed it is one investigation,
 not three.
 
-**Six analyst positions plus a forensics bench** — SIFT, REMnux and FLARE on the same segment — with tooling ready — and
+**Six analyst positions plus a forensics bench** — SIFT and REMnux on the same segment — with tooling ready — and
 deliberately excluded from the emulated-user population, so an analyst's own
 activity never contaminates the host they investigate from.
 
@@ -71,9 +71,9 @@ up, run the exercise, rebuild it clean.
 | | |
 |---|---|
 | **Scale** | 72 hosts across 13 host-bearing segments, plus 7 point-to-point transit links |
-| **Identity** | `voltgrid.com` — three domain controllers, 40 domain members, 32 emulated users |
+| **Identity** | `voltgrid.com` — three domain controllers, 39 domain members, 32 emulated users |
 | **Corporate** | Services, Business Processing, Engineering, Legal, InfoSec |
-| **Perimeter** | DMZ with public web, DNS and mail; simulated Internet beyond |
+| **Perimeter** | DMZ with public web and DNS; simulated Internet beyond |
 | **OT enclave** | Control network, gas turbine, turbine simulation and OT services — PLC, historian, vibration sensor, engineering workstation |
 | **Security** | Security Onion grid plus six analyst workstations |
 | **Routing** | OSPF core, eBGP at the ISP edge, static across the OT boundary |
@@ -85,7 +85,7 @@ up, run the exercise, rebuild it clean.
 | Skill | How the range exercises it |
 |---|---|
 | Network forensics | Full packet visibility on three segments via layer-2 mirrors — Zeek connection, DNS, HTTP and file logs |
-| Endpoint investigation | Sysmon and Elastic Agent process, file and network telemetry across 42 hosts |
+| Endpoint investigation | Sysmon and Elastic Agent process, file and network telemetry across 43 hosts |
 | Lateral movement detection | Segment-aware sensor placement makes east-west movement observable as a change in *which* sensor carries the traffic |
 | IT/OT boundary defence | A real firewall boundary with its own DC — crossing it is detectable, and the plant side gives deliberately reduced visibility |
 | Alert triage under load | Continuous emulated user activity means signal must be separated from genuine background noise |
