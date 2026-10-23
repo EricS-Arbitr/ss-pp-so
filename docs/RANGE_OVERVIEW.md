@@ -96,10 +96,13 @@ up, run the exercise, rebuild it clean.
 ## Deployment
 
 Ansible from a pinned, versioned tarball. Two to three hours from a clean
-blueprint to a verified range, unattended. Verification asserts what actually
-matters — that sensors are receiving packets, that Zeek is producing connection
-records, that every endpoint is enrolled — not merely that the playbook exited
-zero.
+blueprint to a verified range, unattended. Its major install artifacts —
+Security Onion and Malcolm, their container images, and the Ansible collections
+— come from the platform's own package repository rather than the public
+internet, so a build is deterministic and does not depend on upstream
+availability. Verification asserts what actually matters — that sensors are
+receiving packets, that Zeek is producing connection records, that every
+endpoint is enrolled — not merely that the playbook exited zero.
 
 ---
 

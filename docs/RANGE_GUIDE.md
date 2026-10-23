@@ -306,7 +306,7 @@ than opaque TCP.
 | Property | Value |
 |---|---|
 | Host | `pp-ot-malcolm`, PP-OT-DMZ `192.168.90.130`, mgmt `10.255.240.220` |
-| Stack | Malcolm 26.09.0 (OpenSearch, Arkime, Zeek, Suricata, Logstash) under Docker |
+| Stack | Malcolm 26.08.0 (OpenSearch, Arkime, Zeek, Suricata, Logstash) under Docker |
 | Capture | live on `otmir0` — Zeek, Suricata and netsniff-ng read the decapsulated mirror |
 | Feed | a `gretap` mirror from `pp-ot-router` carrying the process segments |
 | Web UI | `https://192.168.90.130`, basic auth `analyst` |
@@ -430,6 +430,31 @@ asynchronously, so a first-attempt failure is often ordering rather than fault.
 Expect **two to three hours** for a full build from a fresh blueprint. The
 Security Onion manager install alone is 20–30 minutes and the search and sensor
 installs 5–10 each.
+
+### Where the install artifacts come from
+
+The build pulls its install media from the in-platform Nexus
+(`nexus.dev.ng.simspace.lan`), reached through the management proxy
+(`10.255.240.1:3128`) rather than the public internet:
+
+| Artifact | Nexus repo |
+|---|---|
+| Security Onion source snapshot and airgap content | `ng_raw` (`installers/so/…`) |
+| Security Onion and Malcolm container images | `nexus-docker` |
+| Malcolm 26.08.0 source | `ng_raw` (`installers/malcolm/…`) |
+| Ansible Galaxy collections | `ng_raw/galaxy` |
+| Billing-portal Python packages | `ng_pypi` |
+
+apt is the exception: base packages and `docker-ce` install from the Ubuntu
+archive and `download.docker.com` through the proxy, because the Nexus apt repo
+serves several Ubuntu releases from one index and no apt pin can safely prefer
+the right one.
+
+Nexus presents an internal-CA certificate, so each fetcher that reaches it —
+`get_url`, `skopeo`, `ansible-galaxy`, `pip`, and dockerd — is configured to
+trust or skip-verify that host specifically. If a deploy fails early pulling the
+SO source or a Galaxy collection, confirm the controller can reach Nexus through
+the proxy before looking at the playbook.
 
 ### Verifying
 
