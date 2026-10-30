@@ -16,6 +16,20 @@ Severity key:
 
 
 
+## 2026-10-29 · platform · pp-ot-router appliance ages out OT neighbors, stranding a subset of OT hosts
+
+**Symptom.** A fresh ss-pp-so deploy failed all 3 attempts. By attempt 3 the hard failures were `pp-ctl-wks-01/03/04` at the member "domain never became resolvable" gate, `pp-dc03` at `additional_dc : Fail if no domain controller became locatable`, and the Fleet coverage gate on `so-manager` naming those same four Missing. `pp-ctl-wks-02` and `pp-dcs-ctrl` — same `192.168.100.0/24` OT subnet, byte-identical DNS config `{192.168.100.5, 172.16.2.7}` — joined and enrolled normally. Routing, pfSense transit (`pp-ot-firewall` lab permit-any with live states), and both DCs' host firewalls (off) were all provably correct, and `pp-ot-firewall` itself could ping both ends.
+
+**Root cause.** The OT subnet reaches corp only across the ESP through `pp-ot-router` — a SimSpace `RC_NG_OT_Router` appliance Ansible can't fully manage (it's in `[vyos_routes_only]`). Two platform-side faults in sequence: (1) the appliance's **data plane converged hours after the deploy's ~5 h / 3-attempt retry budget** — OT↔corp was dead for the entire run, so even the fallback to pp-dc01 (`172.16.2.7`) failed and the `additional_dc` preflight (40×15 s) timed out on every attempt; (2) once up, the appliance **ages out its eth4 neighbor (ARP) entries for idle OT hosts and will not re-resolve them on demand** — `show arp interface eth4` held entries only for hosts with steady cross-ESP traffic (`pp-dcs-ctrl`, `pp-ctl-wks-02`, `pp-dc03`) and *nothing* for `pp-ctl-wks-01/03/04`, which stayed unreachable from corp. Self-reinforcing: no join → no steady traffic → entry ages out → can't establish the traffic that would keep it warm.
+
+**Diagnosis path (reusable).** From the controller over mgmt: confirm the PDC serves the zone (`Resolve-DnsName _ldap._tcp.dc._msdcs.<domain> -Server <pdc>`); then walk OT→corp and corp→OT with pings to **router-interface** targets (which bypass Windows host firewalls) to prove transit reaches the last hop before each endpoint; then `show arp interface eth4` on `pp-ot-router` — missing/incomplete entries for exactly the failing hosts is the signature. The `additional_dc` gate is working as designed throughout: it refuses to promote into the broken path and leaves no zone-less DNS server behind, which is why the blast radius stayed at 4 hosts instead of taking the whole OT segment's name resolution with it.
+
+**Recovery (no playbook change).** Wait for the appliance to converge, then reboot the stranded OT hosts to force gratuitous ARP — `ansible <hosts> -m win_reboot` — so they reappear in the appliance's neighbor table and reach corp. Then re-run only the slice: `ansible-playbook playbooks/00-baseline.yml --limit '<pp-dc03>,<ctl-wks…>'` (the `Join Domain` play runs before `Additional DC`, so the workstations join via the now-reachable corp-DNS fallback, then `pp-dc03` promotes and becomes their local OT DNS), followed by `ansible-playbook playbooks/75-endpoint.yml`. Verified green 2026-10-29: `pp-dc03` NTDS+DNS Running and promoted, the three ctl-wks `PartOfDomain=True`, Fleet coverage gate SKIPPED (Missing: none). A full re-deploy is unnecessary and won't help while the appliance is still converging.
+
+**Upstream ask (platform, not Ansible).** The `RC_NG_OT_Router` appliance should (a) have its data plane up before the platform reports the range ready, and (b) re-resolve neighbors on demand rather than black-holing aged-out hosts. Until then this is an operator recovery.
+
+---
+
 ## 2026-09-29 · bug · roles/group_assignment — community.windows.win_domain_user is REMOVED upstream
 
 **Symptom.** With community.windows 3.x installed, the entire baseline playbook
