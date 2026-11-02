@@ -1,13 +1,15 @@
-# ss-pp-so — Range Reference
+# Voltgrid Power — Range Reference
 
 Technical reference for the `voltgrid.com` power-utility range: topology,
 telemetry coverage, deployment procedure and verification.
 
-Audience: range operators and instructors. Assumes working knowledge of
-Security Onion, Active Directory and Ansible.
+Audience: event coordinators and range operators. Assumes working knowledge of
+Security Onion, Active Directory, Ansible, and the SimSpace platform.
 
-Scope: this document covers the range as built by `ss-pp-so`. Security Onion
-is the only SIEM; every log source on the range reports to it.
+Scope: this document covers the range and its variants. Every variant runs a
+distributed Security Onion grid as its network-security monitoring; one variant
+additionally runs a distributed Splunk cluster, with a universal forwarder on
+every managed host feeding it in parallel with the Elastic Agent.
 
 ---
 
@@ -19,10 +21,10 @@ is the only SIEM; every log source on the range reports to it.
 | **AD forest** | `voltgrid.com`, three domain controllers, 39 domain members |
 | **Corporate segments** | Services, Business Processing, Engineering, Legal, InfoSec |
 | **OT enclave** | Four segments behind a dedicated firewall — control, turbine, turbine-sim, OT services |
-| **SIEM** | Security Onion 2.4 distributed — manager, search node, three sensors |
+| **SIEM** | Security Onion 2.4 distributed — manager, search node, three sensors; the stacked variant adds a distributed Splunk cluster alongside it |
 | **Network visibility** | Three GRE `gretap` mirrors covering corporate, OT and the attack path |
 | **OT deep-packet analysis** | Malcolm (CISA) on PP-OT-DMZ — the OT process segments are mirrored to it for ICS-protocol parsing (OPC-UA, Modbus, S7, DNP3) in addition to Security Onion |
-| **Endpoint visibility** | Elastic Agent on Windows and Linux hosts, enrolled into SO's Fleet |
+| **Endpoint visibility** | Elastic Agent on Windows and Linux hosts, enrolled into SO's Fleet; the stacked variant adds a Splunk universal forwarder on every managed host |
 | **Application log sources** | nginx, Squid, pfSense and VyOS, parsed into their own datasets |
 | **Analyst positions** | Six dedicated hunt workstations on the security segment |
 | **Attack sources** | Red-1 (Kali) for manual operations, SimSpace attack emulation for automated |
@@ -194,6 +196,24 @@ Distributed 2.4 grid on the security segment:
 | `so-sensor-corp` | 172.16.9.40 | Corporate traffic |
 | `so-sensor-ot` | 172.16.9.41 | OT traffic |
 | `so-sensor-edge` | 172.16.9.42 | Attack path and Internet |
+
+### Splunk (stacked variant)
+
+One variant runs a distributed Splunk cluster on the security segment alongside
+the Security Onion grid, giving a second, independent SIEM over the same estate:
+
+| Node | Address | Role |
+|---|---|---|
+| `pp-splunk` | 172.16.9.20 | Search head (analyst-facing) |
+| `pp-splunk-idx01` | 172.16.9.21 | Indexer (cluster peer) |
+| `pp-splunk-idx02` | 172.16.9.22 | Indexer (cluster peer) |
+| `pp-splunk-cm` | 172.16.9.23 | Cluster manager + license peer |
+
+A universal forwarder on every managed host ships Windows event logs and Sysmon,
+Linux syslog, and the device syslog aggregated on `pp-syslog` to the indexers, in
+parallel with the Elastic Agent path into Security Onion. The two SIEMs are
+independent — the same sources feed both — so a cohort can work either platform
+over identical activity. The monitoring-only variant omits this cluster.
 
 ### What each sensor sees
 
@@ -367,8 +387,8 @@ additionally in `[unmanaged]`, which is what excludes it from
 **Why the detonation host is not instrumented.** Sysmon and Elastic Agent on
 a box whose purpose is executing malware emit process trees, network
 connections and file writes indistinguishable from an intrusion — because they
-are one, just an authorised one. Enrolling it would feed instructor activity
-into the SIEM students are hunting in, producing the most convincing false
+are one, just an authorised one. Enrolling it would feed event-coordinator
+activity into the SIEM trainees are hunting in, producing the most convincing false
 positives available. `pp-sift` is the opposite case: it analyses evidence,
 executes nothing hostile, and holds the investigation's work product, which
 makes it a target worth monitoring. It is not enrolled yet — see `hosts` for
