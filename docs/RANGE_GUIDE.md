@@ -6,10 +6,8 @@ telemetry coverage, deployment procedure and verification.
 Audience: event coordinators and range operators. Assumes working knowledge of
 Security Onion, Active Directory, Ansible, and the SimSpace platform.
 
-Scope: this document covers the range and its variants. Every variant runs a
-distributed Security Onion grid as its network-security monitoring; one variant
-additionally runs a distributed Splunk cluster, with a universal forwarder on
-every managed host feeding it in parallel with the Elastic Agent.
+Scope: this document covers the range. Security Onion is the SIEM; every log
+source on the range reports to it.
 
 ---
 
@@ -21,10 +19,10 @@ every managed host feeding it in parallel with the Elastic Agent.
 | **AD forest** | `voltgrid.com`, three domain controllers, 39 domain members |
 | **Corporate segments** | Services, Business Processing, Engineering, Legal, InfoSec |
 | **OT enclave** | Four segments behind a dedicated firewall — control, turbine, turbine-sim, OT services |
-| **SIEM** | Security Onion 2.4 distributed — manager, search node, three sensors; the stacked variant adds a distributed Splunk cluster alongside it |
+| **SIEM** | Security Onion 2.4 distributed — manager, search node, three sensors |
 | **Network visibility** | Three GRE `gretap` mirrors covering corporate, OT and the attack path |
 | **OT deep-packet analysis** | Malcolm (CISA) on PP-OT-DMZ — the OT process segments are mirrored to it for ICS-protocol parsing (OPC-UA, Modbus, S7, DNP3) in addition to Security Onion |
-| **Endpoint visibility** | Elastic Agent on Windows and Linux hosts, enrolled into SO's Fleet; the stacked variant adds a Splunk universal forwarder on every managed host |
+| **Endpoint visibility** | Elastic Agent on Windows and Linux hosts, enrolled into SO's Fleet |
 | **Application log sources** | nginx, Squid, pfSense and VyOS, parsed into their own datasets |
 | **Analyst positions** | Six dedicated hunt workstations on the security segment |
 | **Attack sources** | Red-1 (Kali) for manual operations, SimSpace attack emulation for automated |
@@ -196,24 +194,6 @@ Distributed 2.4 grid on the security segment:
 | `so-sensor-corp` | 172.16.9.40 | Corporate traffic |
 | `so-sensor-ot` | 172.16.9.41 | OT traffic |
 | `so-sensor-edge` | 172.16.9.42 | Attack path and Internet |
-
-### Splunk (stacked variant)
-
-One variant runs a distributed Splunk cluster on the security segment alongside
-the Security Onion grid, giving a second, independent SIEM over the same estate:
-
-| Node | Address | Role |
-|---|---|---|
-| `pp-splunk` | 172.16.9.20 | Search head (analyst-facing) |
-| `pp-splunk-idx01` | 172.16.9.21 | Indexer (cluster peer) |
-| `pp-splunk-idx02` | 172.16.9.22 | Indexer (cluster peer) |
-| `pp-splunk-cm` | 172.16.9.23 | Cluster manager + license peer |
-
-A universal forwarder on every managed host ships Windows event logs and Sysmon,
-Linux syslog, and the device syslog aggregated on `pp-syslog` to the indexers, in
-parallel with the Elastic Agent path into Security Onion. The two SIEMs are
-independent — the same sources feed both — so a cohort can work either platform
-over identical activity. The monitoring-only variant omits this cluster.
 
 ### What each sensor sees
 
@@ -535,21 +515,21 @@ before it can break routing. Seeing it is good; it means the guard is working.
 
 ## Credentials
 
-> Passwords are stored in `group_vars/all/vault.yml` (Ansible Vault). The
-> values below are the current range defaults. **Rotate them before any
-> deployment that is not a lab.**
+> Credentials are stored in `group_vars/all/vault.yml` (Ansible Vault); the
+> password values are omitted here because this repository is public. **Rotate
+> all defaults before any deployment that is not a lab.**
 
 | System | Access | Username | Password |
 |---|---|---|---|
-| Security Onion SOC | `https://172.16.9.30` | `admin@voltgrid.com` | `Simspace1!Simspace1!` |
-| Domain admin | `voltgrid.com` | `simspace` | `Simspace1!Simspace1!` |
-| Domain users | `voltgrid.com` | see emulated identities | `Simspace1!Simspace1!` |
-| Windows servers | RDP / WinRM | `simspace` | `Simspace1!Simspace1!` |
-| Windows 10/11 workstations | RDP / WinRM | `xadmin` | `ConfigingInTheNameOf1!` |
-| Linux hosts | SSH | `simspace` | `simspace1` |
-| pfSense firewalls | SSH / web | `admin` | `simspace1` |
-| VyOS routers | SSH | `vyos` | `Simspace1!` |
-| SO node join secret | — | — | `Simspace1!Simspace1!` |
+| Security Onion SOC | `https://172.16.9.30` | `admin@voltgrid.com` | (see vault) |
+| Domain admin | `voltgrid.com` | `simspace` | (see vault) |
+| Domain users | `voltgrid.com` | see emulated identities | (see vault) |
+| Windows servers | RDP / WinRM | `simspace` | (see vault) |
+| Windows 10/11 workstations | RDP / WinRM | `xadmin` | (see vault) |
+| Linux hosts | SSH | `simspace` | (see vault) |
+| pfSense firewalls | SSH / web | `admin` | (see vault) |
+| VyOS routers | SSH | `vyos` | (see vault) |
+| SO node join secret | — | — | (see vault) |
 
 Analyst workstations `win-hunt-1..6` autologin, so a practitioner sitting at
 one has a desktop without needing credentials.
