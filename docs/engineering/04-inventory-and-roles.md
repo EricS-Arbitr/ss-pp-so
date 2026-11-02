@@ -72,10 +72,10 @@ No hardcoded IPs or credentials live in tasks or templates — `group_vars` /
 
 ## Roles
 
-Roles are pulled from `../range-development-ansible/roles/` first, then
-overridden by the local `./roles/`. The tarball bundles ~29 base roles + 30
-custom roles = ~50 total; the exact set is auto-discovered from every play (see
-[05-build-and-deploy.md](05-build-and-deploy.md)).
+Roles are pulled from SimSpace's core Ansible library first, then overridden by
+the local overlay roles. The tarball bundles the base roles it uses plus the
+custom overlays; the exact set is auto-discovered from every play (see the
+build & deploy chapter).
 
 ### Custom / overlay roles
 

@@ -28,8 +28,8 @@ where the tarball is built and versioned; the running range only ever sees
 plus `site.yml` and `playbooks/00-baseline.yml`, understanding `roles:`,
 `import_role` and `include_role` (so a role referenced only via
 `import_role` + `tasks_from`, like `vyos_mirror`, is still bundled). Each role
-is taken from `../range-development-ansible/roles/` first, then overridden by
-the local `./roles/`. Bundled artifacts: roles, playbooks, `hosts`,
+is taken from SimSpace's core Ansible library first, then overridden by
+the local overlay roles. Bundled artifacts: roles, playbooks, `hosts`,
 `group_vars`, `host_vars`, the verifier scripts, `deploy.sh`,
 `requirements.yml`, the vendored `collections/`, and the ETOPEN `rules/`.
 **Not** bundled: `docs/`, `blueprints/`.
@@ -69,10 +69,10 @@ git show HEAD:ab_pp.tgz | tar xzO ./hosts | grep -c <thing>   # spot-check conte
 
 Hand over a **commit-pinned** raw URL (not a branch URL — branch URLs are
 CDN-cached):
-`https://raw.githubusercontent.com/EricS-Arbitr/ss-pp-so/<full-sha>/ab_pp.tgz`
+`https://raw.githubusercontent.com/<org>/<range-repo>/<full-sha>/ab_pp.tgz`
 
-Then point the blueprint's `download-range-vars-script` at that SHA (see
-[08-operations-and-troubleshooting.md](08-operations-and-troubleshooting.md)).
+Then point the blueprint's `download-range-vars-script` at that SHA (see the
+operations & troubleshooting chapter).
 
 ## `deploy.sh` — the 3-attempt retry model
 
@@ -140,9 +140,7 @@ to dedicated policies. Run it first and there is no agent to reassign.
 Every credential lives in `group_vars/all/vault.yml` (ansible-vault).
 `ansible.cfg` points `vault_password_file` at `/home/simspace/.vault_pass` on
 the controller, which **does not persist across range spin-ups** — `deploy.sh`
-fails closed with the recreate command when it is missing. The repo is public:
-never write the vault password into it; the password file and `*.pem/*.p12/
-id_rsa*` are gitignored.
+fails closed with the recreate command when it is missing.
 
 ## Artifact sourcing (Nexus)
 

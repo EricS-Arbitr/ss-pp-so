@@ -28,7 +28,7 @@ sibling role for this in the base repo).
 - The OT plant devices and the forensics VMs are not domain-joined.
 
 Counts are derived from the inventory; re-derive after inventory changes (see
-[04-inventory-and-roles.md](04-inventory-and-roles.md)).
+the inventory & roles chapter).
 
 ## Emulated users
 
@@ -48,7 +48,7 @@ to a management IP half the time. Two mitigations are wired in:
 1. A baseline play strips the management interface from AD DNS registration and
    scrubs `10.255.240.x` A records. (The base `common` role's own attempt at
    this has known bugs — a typo'd adapter name and the wrong cmdlet parameter —
-   so the overlay play is the real fix; see `../../UPSTREAM_FIXES.md`.)
+   so the overlay play is the real fix.)
 2. DCs force-register and prove their locator SRV records (`nltest /dsregdns`)
    before any member join runs, because a fresh build sometimes starts joins
    before Netlogon has registered them.
@@ -61,7 +61,7 @@ to a management IP half the time. Two mitigations are wired in:
 The `dns` role does not set forwarders, so anything outside `voltgrid.com` is
 unresolvable on domain workstations until a baseline play points both corporate
 DCs at `is-inet`'s simulated public resolvers. This is deliberate: it keeps the
-range self-contained while still giving players name resolution for scenario
+range self-contained while still giving trainees name resolution for scenario
 domains.
 
 ## Child-DC / DNS-partition convergence note

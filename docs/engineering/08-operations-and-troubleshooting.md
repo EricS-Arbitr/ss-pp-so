@@ -22,7 +22,7 @@ lab.
 Workstation and server local accounts **differ** (`xadmin` vs `simspace`) — the
 workstation images ship a different account. Using the wrong one does not fail
 fast; it retries to timeout and looks like an unbooted host. The hunt
-workstations autologin, so a player at one has a desktop without credentials.
+workstations autologin, so a trainee at one has a desktop without credentials.
 
 ### Rotation
 
@@ -51,7 +51,7 @@ argspec.
   good — the guard is working.
 - **A first-attempt host failure.** Usually ordering, not fault — the host
   depends on state another reaches asynchronously. Attempt 3 is the
-  confirmation (see [05-build-and-deploy.md](05-build-and-deploy.md)).
+  confirmation (see the build & deploy chapter).
 
 ## Common pitfalls
 
@@ -77,9 +77,9 @@ argspec.
 8. **The `dns` role sets no forwarders** — non-`voltgrid.com` names don't
    resolve until the baseline forwarders play runs.
 
-The authoritative, dated list of overlay workarounds is
-[`../../UPSTREAM_FIXES.md`](../../UPSTREAM_FIXES.md) — read it before changing
-network or AD plumbing; half the time the problem is already diagnosed there.
+The authoritative, dated list of overlay workarounds lives in the range's
+upstream-fixes log — read it before changing network or AD plumbing; half the
+time the problem is already diagnosed there.
 
 ## Re-deploying and resetting
 
@@ -102,13 +102,12 @@ intent before wiring destructive resets.
 The deploy chain is driven by the blueprint, not git. After building and
 pushing a new `ab_pp.tgz`:
 
-1. Build, commit and push the tarball (see
-   [05-build-and-deploy.md](05-build-and-deploy.md)); note the **full** commit
-   SHA.
-2. Edit `blueprints/ARBITR_PP_SecOnion-*.yml` → the
-   `download-range-vars-script` `content:` → replace the SHA in the
-   `raw.githubusercontent.com/EricS-Arbitr/ss-pp-so/<sha>/ab_pp.tgz` URL.
-3. Confirm: `grep -o "ss-pp-so/[0-9a-f]*/ab_pp.tgz" blueprints/…yml`.
+1. Build, commit and push the tarball (see the build & deploy chapter); note
+   the **full** commit SHA.
+2. Edit the platform blueprint → the `download-range-vars-script` `content:` →
+   replace the SHA in the
+   `raw.githubusercontent.com/<org>/<range-repo>/<sha>/ab_pp.tgz` URL.
+3. Confirm: `grep -o "<range-repo>/[0-9a-f]*/ab_pp.tgz" <blueprint>`.
 4. A fresh range fetches that exact tarball via `wget … -e https_proxy=
    10.255.240.1:3128` (curl does **not** work through this proxy on the
    controller; wget does).

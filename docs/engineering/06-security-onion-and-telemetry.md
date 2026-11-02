@@ -1,8 +1,11 @@
-# 06 — Security Onion and Telemetry
+# 06 — Security Monitoring and Telemetry
 
-Security Onion is the range's **only** SIEM; every log source reports to it.
-Malcolm adds ICS-protocol deep-packet analysis for the OT enclave but is not a
-SIEM.
+Security Onion is the range's network-security monitoring grid; every log source
+reports to it. Malcolm adds ICS-protocol deep-packet analysis for the OT enclave
+but is not a SIEM. On the **Splunk-stacked variant** a distributed Splunk
+cluster runs alongside Security Onion, fed in parallel by a universal forwarder
+on every managed host (see "Splunk cluster" below); the two monitoring stacks
+are independent.
 
 ## The grid
 
@@ -54,16 +57,15 @@ needs internet access.
 
 ## Positional sensor coverage
 
-Each sensor is fed by exactly one router's `gretap` mirror (see
-[02-network.md](02-network.md) for the `tc`/`gretap` mechanics). There is no
-aggregation tap, so:
+Each sensor is fed by exactly one router's `gretap` mirror (see the network
+chapter for the `tc`/`gretap` mechanics). There is no aggregation tap, so:
 
 - An event on `so-sensor-ot` and absent from `so-sensor-corp` is traffic that
   did **not** cross the OT boundary.
 - Cross-segment activity must be correlated across sensors, not read from one
   stream.
 - The management plane is excluded from every mirror (`action pass` for
-  `10.255.240.0/20` ahead of the `mirred` catch-all), so players never see the
+  `10.255.240.0/20` ahead of the `mirred` catch-all), so trainees never see the
   orchestration plane.
 
 The single most common sensor failure is a `gre` (layer-3) tunnel where a
@@ -72,10 +74,10 @@ produces **zero** `conn.log` records. Both tunnel ends must be `gretap`.
 
 ## Endpoint telemetry
 
-`elastic_agent` enrols every `[windows]` (43) and `[linux]` (8) host into SO's
-Fleet from controller-staged installers. **Sysmon** runs on the `[sysmon]`
-subset (41 Windows hosts; `pp-dcs-ctrl` and `pp-dmz-dns` excluded — see
-[04-inventory-and-roles.md](04-inventory-and-roles.md)).
+`elastic_agent` enrols every `[windows]` and `[linux]` host into SO's Fleet from
+controller-staged installers. **Sysmon** runs on the `[sysmon]` subset — the
+exclusions are policy (for example `pp-dcs-ctrl` and `pp-dmz-dns`; see the
+inventory & roles chapter).
 
 `pp-dcs-ctrl` is the instructive exclusion: it carries an Elastic Agent (reads
 the Windows event logs Windows already writes) but **no** Sysmon (no kernel
@@ -118,6 +120,37 @@ bodies stay as text with `log.file.path` carrying the router name.
 - `so_fleet_integrations` drives `elastic_fleet_integration_create/_update`
   directly rather than `so-elastic-fleet-integration-policy-load`, which walks
   only hardcoded directories and would never read one we add.
+
+## Splunk cluster (stacked variant)
+
+On the Splunk-stacked variant, a distributed Splunk Enterprise cluster runs on
+`pp-security` alongside the Security Onion grid, giving analysts a second,
+independent SIEM over the same estate:
+
+| Node | Address | Role |
+|---|---|---|
+| `pp-splunk` | `172.16.9.20` | Search head (analyst-facing web UI) |
+| `pp-splunk-idx01` | `172.16.9.21` | Indexer (cluster peer) |
+| `pp-splunk-idx02` | `172.16.9.22` | Indexer (cluster peer) |
+| `pp-splunk-cm` | `172.16.9.23` | Cluster manager + license peer |
+
+The indexers form a single indexer cluster (label `pp-idxc`); the cluster
+manager distributes `indexes.conf` and holds the license. Collection is by
+**universal forwarder on every managed host**, driven by membership of
+`[splunk-forwarder]` (its children are the server and workstation groups), with
+`[splunk_forwarder_exempt]` carving out the hosts that must not forward:
+
+- Windows hosts forward event logs and Sysmon.
+- Linux hosts forward syslog and service logs.
+- Firewalls/routers can't run a forwarder, so their syslog is aggregated on
+  `pp-syslog` and a forwarder there ships `/var/log/remote/*` to the indexers.
+- OT instrumentation mirrors the Security-Onion stance: process-critical OT
+  equipment gets a forwarder only where a conservative programme would place
+  one, expressed through group membership rather than per-host edits.
+
+Because the forwarder path and the Elastic Agent path are independent, the same
+source feeds both stacks — an analyst can be trained or assessed on either, and
+a gap in one is not a gap in the other.
 
 ## Malcolm — OT deep-packet analysis
 

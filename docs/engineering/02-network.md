@@ -1,20 +1,20 @@
 # 02 — Network
 
 All IPs, prefixes and interface assignments are owned by the blueprint and by
-`host_vars`; this doc is the reconciled map. Re-derive from
-`blueprints/ARBITR_PP_SecOnion-*.yml` after any topology change.
+`host_vars`; this doc is the reconciled map. Re-derive from the platform
+blueprint after any topology change.
 
 ## Planes
 
 | Plane | Range | Notes |
 |---|---|---|
-| Production (scenario) | `172.16.0.0/16`, `192.168.0.0/16`, `200.200.200.0/24`, `210.210.210.0/24`, `75.21.1.0/30` | What players and sensors see |
+| Production (scenario) | `172.16.0.0/16`, `192.168.0.0/16`, `200.200.200.0/24`, `210.210.210.0/24`, `75.21.1.0/30` | What trainees and sensors see |
 | Management (out-of-band) | `10.255.240.0/20`, gw/proxy `10.255.240.1` | Ansible path; hidden from scenario; mirror-excluded |
 | Control (orchestration) | `control-10` = `10.10.0.0/16` | Ansible controller only (`ansible` = `10.10.10.10`) |
 
 The management plane shares a data-plane NIC on the mirror-source routers, so it
 is explicitly excluded from the mirror fabric (see below) and scrubbed from AD
-DNS (see [03-active-directory.md](03-active-directory.md)).
+DNS (see the Active Directory chapter).
 
 ## Host-bearing segments
 
@@ -49,8 +49,7 @@ DNS (see [03-active-directory.md](03-active-directory.md)).
 
 ## Routing model
 
-Verified against `host_vars`; see [`../../CLAUDE.md`](../../CLAUDE.md) for the
-full rationale.
+Verified against `host_vars`.
 
 | Domain | Protocol | Notes |
 |---|---|---|
@@ -78,9 +77,8 @@ commands.
 | `pp-ot-router` | VyOS (`vyos_routes_only`) | head of the OT chain |
 
 pfSense specifics (admin-user requirement, `php -r` escape hatches, FRR runtime
-dir, NIC ordering) are in
-[08-operations-and-troubleshooting.md](08-operations-and-troubleshooting.md) and
-`roles/pfsense_firewall`.
+dir, NIC ordering) are in the operations & troubleshooting chapter and the
+`pfsense_firewall` role.
 
 ## DNS
 

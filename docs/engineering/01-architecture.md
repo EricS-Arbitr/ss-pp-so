@@ -2,21 +2,23 @@
 
 ## What this range is
 
-Voltgrid Power is a 72-host simulated electric utility built as a **defensive
-cyber range** on the SimSpace NG platform. It exists to train and assess SOC
-analysts against a network that behaves like a real IT/OT estate: a real Active
-Directory forest, a real DMZ, a segmented OT enclave running gas-turbine plant
-equipment, continuous emulated-user noise, and a distributed Security Onion grid
-watching from three vantage points.
+Voltgrid Power is a simulated electric utility built as a **defensive cyber
+range** on the SimSpace NG platform. It exists to train and assess SOC analysts
+against a network that behaves like a real IT/OT estate: a real Active Directory
+forest, a real DMZ, a segmented OT enclave running gas-turbine plant equipment,
+continuous emulated-user noise, and a distributed Security Onion grid watching
+from three vantage points. One variant additionally runs a distributed Splunk
+cluster, with a universal forwarder on every managed host feeding it alongside
+the Elastic Agent.
 
 The whole range is **Ansible from a pinned tarball**. It stands up, re-deploys
 and resets idempotently so an exercise can be run, torn down and rebuilt
 clean.
 
-`ss-pp-so` is a **range-specific overlay** on top of the customer's shared
-platform repo (`../range-development-ansible/`). The overlay ships inventory,
-`host_vars`, `group_vars`, custom roles and range playbooks, then bundles the
-base roles it uses plus its own overlays into `ab_pp.tgz`.
+The range is built by a **range-specific overlay** on top of SimSpace's core
+Ansible library. The overlay ships inventory, `host_vars`, `group_vars`, custom
+roles and range playbooks, then bundles the base roles it uses plus its own
+overlays into the deploy tarball (`ab_pp.tgz`).
 
 ## Design decisions that shape everything downstream
 
@@ -27,8 +29,8 @@ against them.
    layer-2 mirror from exactly one router. An event is visible only to the
    sensor whose router carries it; there is no aggregation tap. Correlating an
    intrusion across segments means correlating across sensors, and *which*
-   sensor carries an event is itself a location signal. See
-   [06-security-onion-and-telemetry.md](06-security-onion-and-telemetry.md).
+   sensor carries an event is itself a location signal. See the security
+   monitoring & telemetry chapter.
 
 2. **The OT enclave is segmented at layer 3.** `pp-ot-firewall` is a
    default-deny boundary; OT reaches corporate over static routes only. A third
@@ -36,19 +38,19 @@ against them.
    authenticate locally and routine identity traffic never crosses the
    boundary — which makes it a signal when it does.
 
-3. **Endpoint telemetry is deliberately non-uniform.** 41 of 43 Windows hosts
-   run Sysmon; the exclusions are policy, not oversight, and are expressed as
+3. **Endpoint telemetry is deliberately non-uniform.** Most Windows hosts run
+   Sysmon; the exclusions are policy, not oversight, and are expressed as
    inventory-group membership so "does this host emit endpoint telemetry" is a
-   decision someone recorded. See
-   [04-inventory-and-roles.md](04-inventory-and-roles.md).
+   decision someone recorded. See the inventory & roles chapter.
 
-4. **The network is not quiet.** 32 emulated users browse, open documents and
-   move files continuously across the corporate segments. Detection logic that
+4. **The network is not quiet.** Emulated users browse, open documents and move
+   files continuously across the corporate segments. Detection logic that
    assumes a clean baseline will not behave as it does in a lab.
 
-Platform- and customer-level decisions (control plane on `10.255.240.0/20`,
+Platform- and library-level decisions (control plane on `10.255.240.0/20`,
 pfSense firewalls, the OSPF+eBGP+static routing model, role-sourcing policy) are
-recorded in [`../../CLAUDE.md`](../../CLAUDE.md) and are not repeated here.
+set by the platform and SimSpace's core Ansible library, and are not repeated
+here.
 
 ## System architecture
 
@@ -84,13 +86,12 @@ management; the data plane never routes to it. The Ansible controller itself
 sits on a separate control subnet (`control-10`, `10.10.0.0/16`,
 `ansible 10.10.10.10`) and is **not** in `[linux]`.
 
-Full addressing and routing detail is in [02-network.md](02-network.md).
+Full addressing and routing detail is in the network chapter.
 
 ## The three bespoke subsystems
 
 - **Corporate IT** — `voltgrid.com` AD forest, five corporate departments,
-  DMZ, continuous emulated users. See
-  [03-active-directory.md](03-active-directory.md).
+  DMZ, continuous emulated users. See the Active Directory chapter.
 - **OT / gas-turbine plant** — a Purdue-style enclave behind `pp-ot-firewall`:
   a DCS control station and control workstations (`OT-Ctrl`), the plant PLC,
   historian, vibration sensor and engineering workstation (`Gas-Turbine`,
@@ -101,11 +102,12 @@ Full addressing and routing detail is in [02-network.md](02-network.md).
 - **Security / SOC** — the Security Onion grid, six FLARE-imaged hunt
   workstations, and two uninstrumented forensics VMs, all on `pp-security`.
   OT traffic additionally feeds a CISA Malcolm appliance for ICS-protocol deep
-  packet analysis.
+  packet analysis. On the Splunk-stacked variant a distributed Splunk cluster
+  (indexers, a search head and a cluster manager) also lives on this segment.
 
 ## Telemetry / data flows
 
-| Source | Path into the SIEM | Dataset |
+| Source | Path into monitoring | Dataset |
 |---|---|---|
 | Network (corp / OT / edge) | layer-2 `gretap` mirrors → the three sensors → Zeek + Suricata | Zeek `conn`/`dns`/`http`/`files`, Suricata alerts |
 | Windows + Linux endpoints | Elastic Agent → SO Fleet | endpoint (Defend/osquery/system) + Sysmon on the Windows subset |
@@ -114,18 +116,25 @@ Full addressing and routing detail is in [02-network.md](02-network.md).
 | pfSense ×3 / VyOS ×n | devices → `pp-syslog` (rsyslog) → local agent | `logs-pfsense.*`, `logs-vyos-*` |
 | OT process traffic | second `gretap` tunnel → `pp-ot-malcolm` | Malcolm (Arkime/Zeek ICS parsers) |
 
-Everything lands in one platform, parsed into its own dataset, so correlating a
-proxy request with the process that made it and the firewall rule that allowed
-it is one investigation, not three.
+Everything lands in one monitoring platform, parsed into its own dataset, so
+correlating a proxy request with the process that made it and the firewall rule
+that allowed it is one investigation, not three.
+
+**Splunk-stacked variant.** Every managed host additionally runs a Splunk
+universal forwarder. Windows event logs and Sysmon, Linux syslog, and the device
+syslog aggregated on `pp-syslog` are forwarded to the distributed Splunk cluster
+in parallel with the Security Onion path above. The two monitoring stacks are
+independent — the same sources feed both — so analysts can be trained and
+assessed on either.
 
 ## Artifact sourcing (air-gapped)
 
 The range has no general internet egress. Install artifacts come from the
 in-platform **Nexus** (`nexus.dev.ng.simspace.lan`), reached through the
 management proxy: the Security Onion source + container registry, Malcolm's
-source + images, the Ansible Galaxy collections, and the billing-portal Python
-packages. **apt is the exception** — base packages and `docker-ce` install from
-the Ubuntu archive and `download.docker.com` through the proxy, because the
-Nexus apt repo serves several Ubuntu releases from one index and no pin can
-safely prefer the right one. Detail in
-[05-build-and-deploy.md](05-build-and-deploy.md).
+source + images, the Ansible Galaxy collections, the Splunk packages (on the
+stacked variant), and the billing-portal Python packages. **apt is the
+exception** — base packages and `docker-ce` install from the Ubuntu archive and
+`download.docker.com` through the proxy, because the Nexus apt repo serves
+several Ubuntu releases from one index and no pin can safely prefer the right
+one. Detail in the build & deploy chapter.

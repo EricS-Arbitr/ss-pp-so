@@ -6,7 +6,7 @@ checks after a deploy that assert *outcomes*, not exit codes).
 
 ## Build-time gates
 
-Covered in [05-build-and-deploy.md](05-build-and-deploy.md#build-time-gates). In
+Covered in the build & deploy chapter (build-time gates). In
 short, `build_tarball.sh` runs `verify_vars.py`, `verify_shell_args.py`,
 `verify_so_inventory.py`, `verify_dup_keys.py`, `verify_handlers.py`,
 `verify_task_keywords.py` and `verify_defend_filters.py`, and aborts the build
@@ -14,7 +14,7 @@ if any fails. Expected `verify_vars.py` warning count against the stage is **4**
 a different number means something changed.
 
 Run `verify_vars.py` against the **stage**, not the repo root — the stage
-includes base roles copied from `../range-development-ansible/`, so vars like
+includes base roles copied from SimSpace's core Ansible library, so vars like
 `nat` and `splunk_admin_password` appear only there. `build_tarball.sh` already
 runs it against the stage; run it the same way by hand.
 
@@ -39,7 +39,7 @@ sudo ansible so-sensor-corp,so-sensor-edge,so-sensor-ot -b -m shell \
 
 A sensor with Suricata alerting but Zeek producing zero connection logs means
 the tunnel is carrying the wrong frame type — both ends must be `gretap`
-(see [06-security-onion-and-telemetry.md](06-security-onion-and-telemetry.md)).
+(see the security monitoring & telemetry chapter).
 
 Verify a mirror itself with the absolute path (the `vyos` user has no `tc` on
 PATH, and a bare invocation returns "command not found" that a counting grep
