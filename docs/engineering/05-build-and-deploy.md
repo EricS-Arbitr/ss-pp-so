@@ -3,9 +3,9 @@
 ## The deploy chain, end to end
 
 ```
-build_tarball.sh  ──▶  ab_pp.tgz  ──▶  commit + push to GitHub (pinned commit)
+build_tarball.sh  ──▶  powerplant_seconion.tgz  ──▶  commit + push to GitHub (pinned commit)
                                                │
-blueprint download-range-vars-script: wget ab_pp.tgz from the pinned raw URL
+blueprint download-range-vars-script: wget powerplant_seconion.tgz from the pinned raw URL
                                                │  (through mgmt proxy 10.255.240.1:3128)
                                    tar -xzf into /etc/ansible
                                                │
@@ -16,12 +16,12 @@ blueprint deploy-script:  ./deploy.sh | tee /var/log/playbook_run.log
 
 The controller **deploys from the tarball, not a git pull**. The repo is just
 where the tarball is built and versioned; the running range only ever sees
-`ab_pp.tgz`.
+`powerplant_seconion.tgz`.
 
 ## Building the tarball
 
 ```bash
-./build_tarball.sh          # writes ab_pp.tgz; refuses if a gate fails
+./build_tarball.sh          # writes powerplant_seconion.tgz; refuses if a gate fails
 ```
 
 `build_tarball.sh` auto-discovers roles from **every** play under `playbooks/`
@@ -58,18 +58,18 @@ means something changed — investigate before shipping.
 
 ## Publishing
 
-Per the tarball-commit policy: rebuild `ab_pp.tgz` **and** commit it with the
+Per the tarball-commit policy: rebuild `powerplant_seconion.tgz` **and** commit it with the
 code change, every time, because the controller deploys the tarball. After
 committing, **verify the committed artifact, not the working copy**:
 
 ```bash
-git show HEAD:ab_pp.tgz | tar tz | head        # it is really in the commit
-git show HEAD:ab_pp.tgz | tar xzO ./hosts | grep -c <thing>   # spot-check content
+git show HEAD:powerplant_seconion.tgz | tar tz | head        # it is really in the commit
+git show HEAD:powerplant_seconion.tgz | tar xzO ./hosts | grep -c <thing>   # spot-check content
 ```
 
 Hand over a **commit-pinned** raw URL (not a branch URL — branch URLs are
 CDN-cached):
-`https://raw.githubusercontent.com/<org>/<range-repo>/<full-sha>/ab_pp.tgz`
+`https://raw.githubusercontent.com/<org>/<range-repo>/<full-sha>/powerplant_seconion.tgz`
 
 Then point the blueprint's `download-range-vars-script` at that SHA (see the
 operations & troubleshooting chapter).

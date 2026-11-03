@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Build ab_pp.tgz for deployment.
+# Build powerplant_seconion.tgz for deployment.
 #
 # Auto-discovers roles referenced by every playbook under playbooks/ (and their meta
 # dependencies), then bundles:
@@ -23,7 +23,7 @@ set -euo pipefail
 SS_PP_AB="$(cd "$(dirname "$0")" && pwd)"
 SRC_BASE="$(cd "$SS_PP_AB/../range-development-ansible" && pwd)"
 PLAYBOOK="$SS_PP_AB/playbooks/00-baseline.yml"
-ARCHIVE="$SS_PP_AB/ab_pp.tgz"
+ARCHIVE="$SS_PP_AB/powerplant_seconion.tgz"
 STAGE_PARENT="$(mktemp -d)"
 STAGE="$STAGE_PARENT/abpp_build"
 
@@ -390,7 +390,7 @@ if [ -x "$SS_PP_AB/verify_vars.py" ] && command -v python3 >/dev/null 2>&1; then
   # `set -euo pipefail` (line 21), so a bare non-zero exit aborts it. The
   # checker returns 1 for soft warnings on EVERY run, so removing the old
   # `|| true` silently stopped the build before the Pack step -- leaving a
-  # stale ab_pp.tgz committed under seven commits' worth of changes
+  # stale powerplant_seconion.tgz committed under seven commits' worth of changes
   # (2026-08-05). The `||` form keeps errexit satisfied while preserving rc.
   VERIFY_RC=0
   python3 "$SS_PP_AB/verify_vars.py" "$STAGE" || VERIFY_RC=$?

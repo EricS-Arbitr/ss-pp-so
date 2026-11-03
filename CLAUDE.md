@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) and to human develop
 
 This directory (`ss-pp-so/`) is a **range-specific Ansible overlay** for the **PowerPlant** cyber-range scenario (`voltgrid.com` domain) deployed on the **SimSpace NG** platform, with **Security Onion 2.4** as the range's SIEM. It is NOT a standalone playbook — it layers on top of the customer's shared platform repo at `../range-development-ansible/`. See [range-development-ansible/CLAUDE.md](../range-development-ansible/CLAUDE.md) for the platform-level architecture.
 
-Two-sentence summary: `range-development-ansible` ships base roles and a reference playbook. `ss-pp-so` ships range-specific inventory + host_vars + group_vars + custom roles + a range-specific playbook (`playbooks/00-baseline.yml`), bundles selected base roles + the custom overlays into a tarball (`build_tarball.sh` → `ab_pp.tgz`), and the tarball deploys to `/etc/ansible` on the range's Ansible host where `deploy.sh` runs `site.yml`.
+Two-sentence summary: `range-development-ansible` ships base roles and a reference playbook. `ss-pp-so` ships range-specific inventory + host_vars + group_vars + custom roles + a range-specific playbook (`playbooks/00-baseline.yml`), bundles selected base roles + the custom overlays into a tarball (`build_tarball.sh` → `powerplant_seconion.tgz`), and the tarball deploys to `/etc/ansible` on the range's Ansible host where `deploy.sh` runs `site.yml`.
 
 ## Repo layout (just this directory)
 
@@ -27,7 +27,7 @@ ss-pp-so/
 ├── host_vars/                   ← one yaml per managed host
 ├── roles/                       ← custom roles that override or supplement base roles
 ├── docs/                        ← RANGE_GUIDE.md, RANGE_OVERVIEW.md, security-onion/
-├── build_tarball.sh             ← auto-discovers roles, validates, bundles ab_pp.tgz
+├── build_tarball.sh             ← auto-discovers roles, validates, bundles powerplant_seconion.tgz
 ├── deploy.sh                    ← runs site.yml (see the retry model below)
 ├── verify_vars.py               ← Jinja-var presence + role-scope checker
 ├── verify_shell_args.py         ← ★ refuses plays Ansible's split_args() cannot parse
@@ -35,7 +35,7 @@ ss-pp-so/
 ├── requirements.yml             ← Ansible Galaxy collections
 ├── collections/                 ← vendored pfsensible.core (never fetched at deploy time)
 ├── rules/                       ← bundled ETOPEN ruleset
-└── ab_pp.tgz                    ← built artifact; rebuild with build_tarball.sh
+└── powerplant_seconion.tgz                    ← built artifact; rebuild with build_tarball.sh
 ```
 
 Custom roles currently in `roles/` (those not in the base repo, or that override it):
@@ -183,7 +183,7 @@ own argspec.
 
 ```bash
 # Build the tarball (run from this directory)
-./build_tarball.sh                    # writes ab_pp.tgz; refuses if a gate fails
+./build_tarball.sh                    # writes powerplant_seconion.tgz; refuses if a gate fails
 
 # Inspect what will run, in order
 grep 'import_playbook' site.yml

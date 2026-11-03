@@ -100,14 +100,14 @@ intent before wiring destructive resets.
 ## Re-pinning the blueprint to a new tarball
 
 The deploy chain is driven by the blueprint, not git. After building and
-pushing a new `ab_pp.tgz`:
+pushing a new `powerplant_seconion.tgz`:
 
 1. Build, commit and push the tarball (see the build & deploy chapter); note
    the **full** commit SHA.
 2. Edit the platform blueprint → the `download-range-vars-script` `content:` →
    replace the SHA in the
-   `raw.githubusercontent.com/<org>/<range-repo>/<sha>/ab_pp.tgz` URL.
-3. Confirm: `grep -o "<range-repo>/[0-9a-f]*/ab_pp.tgz" <blueprint>`.
+   `raw.githubusercontent.com/<org>/<range-repo>/<sha>/powerplant_seconion.tgz` URL.
+3. Confirm: `grep -o "<range-repo>/[0-9a-f]*/powerplant_seconion.tgz" <blueprint>`.
 4. A fresh range fetches that exact tarball via `wget … -e https_proxy=
    10.255.240.1:3128` (curl does **not** work through this proxy on the
    controller; wget does).
@@ -123,7 +123,7 @@ on a running one (re-pull the tarball by hand to update a live controller).
   `10.255.240.1:3128` and trust/skip-verify `nexus.dev.ng.simspace.lan`.
 - **The `/home/simspace/.vault_pass` file does not persist across spin-ups** —
   recreate it on every fresh controller or `deploy.sh` fails closed.
-- **Verify the committed tarball, not the working copy** (`git show HEAD:ab_pp.tgz`)
+- **Verify the committed tarball, not the working copy** (`git show HEAD:powerplant_seconion.tgz`)
   — a stale or partially-staged tarball has silently shipped before.
 - **`docs/` and `blueprints/` are not deployed** — editing them never changes a
   running range.

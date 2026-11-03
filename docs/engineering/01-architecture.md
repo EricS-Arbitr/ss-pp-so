@@ -18,7 +18,7 @@ clean.
 The range is built by a **range-specific overlay** on top of SimSpace's core
 Ansible library. The overlay ships inventory, `host_vars`, `group_vars`, custom
 roles and range playbooks, then bundles the base roles it uses plus its own
-overlays into the deploy tarball (`ab_pp.tgz`).
+overlays into the deploy tarball (`powerplant_seconion.tgz`).
 
 ## Design decisions that shape everything downstream
 
