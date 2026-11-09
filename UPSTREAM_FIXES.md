@@ -628,7 +628,7 @@ resolvable before its first attempt, not only retry after failing.
 `_ldap._tcp.dc._msdcs.<domain>` to resolve — the SRV record domain join
 actually looks up, so it is the precondition itself rather than a proxy like
 "can I ping the DC". `-DnsOnly` prevents LLMNR/NetBIOS answering falsely
-(CLAUDE.md pitfall 4). 30 × 20s, then a fail naming the host's configured DNS
+(BUILD_SPEC.md pitfall 4). 30 × 20s, then a fail naming the host's configured DNS
 server.
 
 **A bug caught by rendering the failure message.** The diagnostic used
@@ -1857,7 +1857,7 @@ already correctly all-scoped.
 **Why verify_vars.py does not catch this, and cannot as written.** It treats
 any `roles/*/defaults/main.yml` entry as globally defined, so a scope error
 resolves cleanly at build time and fails at run time. Its warning count is
-unchanged at 3. Documented as a known limitation in CLAUDE.md — the rule to
+unchanged at 3. Documented as a known limitation in BUILD_SPEC.md — the rule to
 apply by hand is that a variable read by more than one role, or by any bare
 play, belongs in `group_vars/all/`.
 

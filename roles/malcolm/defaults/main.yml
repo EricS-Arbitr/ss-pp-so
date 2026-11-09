@@ -41,7 +41,7 @@ malcolm_group: malcolm
 malcolm_home: /var/lib/malcolm
 
 # --- Sizing ------------------------------------------------------------------
-# Heaps scale with host RAM (see CLAUDE.md). Malcolm's own defaults (10g/3g)
+# Heaps scale with host RAM (see BUILD_SPEC.md). Malcolm's own defaults (10g/3g)
 # are too large for a 16 GB host.
 malcolm_mem_mb: "{{ ansible_facts['memtotal_mb'] | int }}"
 malcolm_opensearch_heap: >-

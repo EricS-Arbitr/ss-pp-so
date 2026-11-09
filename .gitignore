@@ -241,3 +241,7 @@ docs/security-onion/blueprint-additions.yml
 **/.DS_Store
 *.bak
 *.bak.*
+
+# local editor / patch backups (never commit)
+*.orig
+*.backup-*

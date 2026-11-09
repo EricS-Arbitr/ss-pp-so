@@ -1,10 +1,10 @@
-# CLAUDE.md — ss-pp-so onboarding guide
+# BUILD_SPEC.md — ss-pp-so onboarding guide
 
-This file provides guidance to Claude Code (claude.ai/code) and to human developers picking up the PowerPlant range overlay. Read this first.
+This file is the onboarding guide for developers picking up the PowerPlant range overlay. Read this first.
 
 ## What this project is
 
-This directory (`ss-pp-so/`) is a **range-specific Ansible overlay** for the **PowerPlant** cyber-range scenario (`voltgrid.com` domain) deployed on the **SimSpace NG** platform, with **Security Onion 2.4** as the range's SIEM. It is NOT a standalone playbook — it layers on top of the customer's shared platform repo at `../range-development-ansible/`. See [range-development-ansible/CLAUDE.md](../range-development-ansible/CLAUDE.md) for the platform-level architecture.
+This directory (`ss-pp-so/`) is a **range-specific Ansible overlay** for the **PowerPlant** cyber-range scenario (`voltgrid.com` domain) deployed on the **SimSpace NG** platform, with **Security Onion 2.4** as the range's SIEM. It is NOT a standalone playbook — it layers on top of the customer's shared platform repo at `../range-development-ansible/`. See the platform repo at `../range-development-ansible/` for the platform-level architecture.
 
 Two-sentence summary: `range-development-ansible` ships base roles and a reference playbook. `ss-pp-so` ships range-specific inventory + host_vars + group_vars + custom roles + a range-specific playbook (`playbooks/00-baseline.yml`), bundles selected base roles + the custom overlays into a tarball (`build_tarball.sh` → `powerplant_seconion.tgz`), and the tarball deploys to `/etc/ansible` on the range's Ansible host where `deploy.sh` runs `site.yml`.
 
@@ -12,7 +12,7 @@ Two-sentence summary: `range-development-ansible` ships base roles and a referen
 
 ```
 ss-pp-so/
-├── CLAUDE.md                    ← you are here
+├── BUILD_SPEC.md                    ← you are here
 ├── README.md                    ← what this repo is, build/deploy in brief
 ├── PROJECT_LOG.md               ← chronological build history
 ├── ACTION_PLAN.md               ← original phased plan (mostly done)
@@ -298,7 +298,7 @@ Notable shared variables (defined under `group_vars/all/`):
 
 1. **Customer-role workarounds live as plays, not role forks.** If a base role has a bug or gap, the preferred fix is an additional play in `playbooks/00-baseline.yml` that compensates after the base role runs. Only fork a role into `roles/<name>/` when the workaround can't be expressed as additional tasks (e.g., `syslog_server`, which had no base role at all).
 
-2. **Every overlay workaround → an UPSTREAM_FIXES.md entry, same turn it lands.** Per `~/.claude/projects/-Users-eric-starace-vCity/memory/feedback_upstream_fixes_log.md`. Standard format: `## YYYY-MM-DD · <severity> · <target path / heading>`, severity = `bug` / `gap` / `enhancement` / `platform`. Each entry has Symptom → Detection (if non-obvious) → Fix (upstream) → Workaround (overlay).
+2. **Every overlay workaround → an UPSTREAM_FIXES.md entry, same turn it lands.** Standard format: `## YYYY-MM-DD · <severity> · <target path / heading>`, severity = `bug` / `gap` / `enhancement` / `platform`. Each entry has Symptom → Detection (if non-obvious) → Fix (upstream) → Workaround (overlay).
 
 3. **php -r is the universal pfSense escape hatch.** pfsensible.core 0.7.x doesn't expose: `<defaultgw4>`, `<nat><outbound><mode>`, `<installedpackages><frr>`, `<syslog>`. All of those are driven via `ansible.builtin.shell: php -r '...'` tasks that `require_once("/etc/inc/config.inc")` and call `config_set_path()` + `write_config()`. Pattern is well-established in `roles/pfsense_firewall/tasks/main.yml`.
 
@@ -384,25 +384,21 @@ Resolve-DnsName pp-dc01 -DnsOnly                          # AD DNS only (no LLMN
 ping pp-dc01                                              # Resolves to 172.16.2.7, not mgmt
 ```
 
-## Working with future Claude sessions
+## Working on this repo
 
-A few things that will save the next session time:
+A few things that will save time:
 
 1. **Read UPSTREAM_FIXES.md before making any change to network or AD plumbing.** Half the time, the problem you're seeing has already been diagnosed there.
 
-2. **Auto-memory lives at `~/.claude/projects/-Users-eric-starace-vCity/memory/`.** Two entries currently load: the customer-repo location pointer (`ansible_repo_reference.md`) and the "keep UPSTREAM_FIXES.md current" feedback (`feedback_upstream_fixes_log.md`). Append new feedback or project memories as discoveries warrant; don't duplicate what's already in UPSTREAM_FIXES.md.
+2. **Customer repo (`../range-development-ansible/`) has its own documentation.** Treat that as the platform-level reference; treat this file as the range-level reference. Edits to base roles live in the customer repo; edits to range vars / plays live here.
 
-3. **The `/code-review ultra` workflow is user-triggered and billed; don't attempt to launch it yourself.**
+3. **Don't touch base roles directly to fix bugs.** Add an overlay role with the same name (build_tarball.sh prefers `./roles/<name>` over `../range-development-ansible/roles/<name>`), OR add a compensating play in `playbooks/00-baseline.yml`. Either way, log an UPSTREAM_FIXES.md entry naming the original file and proposing the upstream fix.
 
-4. **Customer repo (`../range-development-ansible/`) has its own CLAUDE.md.** Treat that as the platform-level reference; treat this file as the range-level reference. Edits to base roles live in the customer repo; edits to range vars / plays live here.
+4. **For routing changes**: always confirm the FIB matches the configured intent (`show ip route` on VyOS, `netstat -rn` or `vtysh -c "show ip route"` on pfSense). "The config has the line" is not the same as "the kernel installed the route." Multiple equal-cost statics, image-baked junk routes, and self-loop next-hops all cause FRR to silently drop routes from the FIB.
 
-5. **Don't touch base roles directly to fix bugs.** Add an overlay role with the same name (build_tarball.sh prefers `./roles/<name>` over `../range-development-ansible/roles/<name>`), OR add a compensating play in `playbooks/00-baseline.yml`. Either way, log an UPSTREAM_FIXES.md entry naming the original file and proposing the upstream fix.
+5. **For Windows changes**: pre-existing GPOs, DDNS auto-registration, LLMNR/NetBIOS fallback, and the mgmt subnet being on every host all conspire to produce surprising name-resolution behavior. `Resolve-DnsName -DnsOnly` is the gold-standard test; `ping` and `nslookup` each have their own footguns.
 
-6. **For routing changes**: always confirm the FIB matches the configured intent (`show ip route` on VyOS, `netstat -rn` or `vtysh -c "show ip route"` on pfSense). "The config has the line" is not the same as "the kernel installed the route." Multiple equal-cost statics, image-baked junk routes, and self-loop next-hops all cause FRR to silently drop routes from the FIB.
-
-7. **For Windows changes**: pre-existing GPOs, DDNS auto-registration, LLMNR/NetBIOS fallback, and the mgmt subnet being on every host all conspire to produce surprising name-resolution behavior. `Resolve-DnsName -DnsOnly` is the gold-standard test; `ping` and `nslookup` each have their own footguns.
-
-8. **For pfSense**: `pfctl -vsr`, `xmllint --xpath '//path' /cf/conf/config.xml`, `vtysh`, and `php -r` are the four tools you need. The webConfigurator GUI is a crutch — every change should ultimately be expressible as one of those four.
+6. **For pfSense**: `pfctl -vsr`, `xmllint --xpath '//path' /cf/conf/config.xml`, `vtysh`, and `php -r` are the four tools you need. The webConfigurator GUI is a crutch — every change should ultimately be expressible as one of those four.
 
 ## Useful filesystem locations on a deployed Ansible host
 

@@ -156,7 +156,7 @@ win-hunt-6
 # that list to provision mailboxes at mail.voltgrid.com. Matches how
 # range-development-ansible puts is-inet directly in [site] for the same
 # reason. is-inet still stays out of [windows]/[linux] baseline groups
-# (per CLAUDE.md), so common role doesn't run against it. The other
+# (per BUILD_SPEC.md), so common role doesn't run against it. The other
 # voltgrid.yml vars (domain_name, proxy_server, etc.) are harmless on
 # is-inet -- no play targeting is-inet consumes them.
 [voltgrid]

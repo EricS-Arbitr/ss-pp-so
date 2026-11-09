@@ -119,7 +119,7 @@ so_fleet_integrations:
     # syslog copy landing in system.syslog as unparsed text.
     # The matching squid.conf change is a post-play in
     # playbooks/00-baseline.yml (squid is a base role; workarounds are plays,
-    # not role forks -- CLAUDE.md).
+    # not role forks -- BUILD_SPEC.md).
     # Input key is <policy_template>-<input_type>, and squid`s policy
     # template is named `log`, NOT `squid`. Confirmed against the package
     # 2026-09-09 after the API rejected squid-udp with

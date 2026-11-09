@@ -57,7 +57,7 @@ the only host that reaches out, and only to build those artifacts.
 
 | File | For |
 |---|---|
-| `CLAUDE.md` | working on this repo — layout, conventions, pitfalls, recipes |
+| `BUILD_SPEC.md` | working on this repo — layout, conventions, pitfalls, recipes |
 | `docs/RANGE_GUIDE.md` | operators and instructors |
 | `docs/RANGE_OVERVIEW.md` | the range at a glance |
 | `UPSTREAM_FIXES.md` | customer-repo bugs and the overlay workarounds, with the reasoning |
