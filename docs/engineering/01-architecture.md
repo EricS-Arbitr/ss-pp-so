@@ -133,8 +133,8 @@ The range has no general internet egress. Install artifacts come from the
 in-platform **Nexus** (`nexus.dev.ng.simspace.lan`), reached through the
 management proxy: the Security Onion source + container registry, Malcolm's
 source + images, the Ansible Galaxy collections, the Splunk packages (on the
-stacked variant), and the billing-portal Python packages. **apt is the
-exception** — base packages and `docker-ce` install from the Ubuntu archive and
-`download.docker.com` through the proxy, because the Nexus apt repo serves
-several Ubuntu releases from one index and no pin can safely prefer the right
-one. Detail in the build & deploy chapter.
+stacked variant), the billing-portal Python packages, and the base Ubuntu
+packages and `docker-ce` — the last from the per-release Nexus apt repos
+(`ng-apt-jammy-prod` / `ng-apt-noble-prod`) via the `nexus_apt` role, with
+`archive.ubuntu.com` as a lower-priority fallback. Detail in the build & deploy
+chapter.

@@ -166,6 +166,20 @@ Transitioned:
   **To source apt from Nexus → needs PER-RELEASE dists/repos** (simspace-jammy /
   simspace-noble, or ng-apt-jammy / ng-apt-noble). The uploaded FINAL debs are fine
   but cannot be consumed from a mixed-release dist.
+
+- **Base Ubuntu apt + Docker CE — TRANSITIONED to Nexus (2026-11-20).** The
+  platform published the per-release proxy repos `ng-apt-jammy-prod` /
+  `ng-apt-noble-prod` on `range-registry.dev.ng.simspace.lan` (suite = codename,
+  component `main`; GPG-signed, key fingerprint `94B0 39FE … 0B01 32DD`), carrying
+  the archive closure + Docker CE 29.8.1. `nexus_apt` was rebuilt to install the
+  bundled fingerprint-verified key, write a per-release deb822 source, pin it above
+  `archive.ubuntu.com` (kept as a fallback), and skip TLS-verify for `range-registry`
+  only (internal CA; integrity via the signature). `docker_engine_use_nexus_apt: true`.
+  First deploy tripped on the apt module's `update_cache` hard-failing against the
+  image's stale `apt.puppet.com`/`apt.puppetlabs.com` sources ("Failed to update apt
+  cache: unknown reason"); fixed by switching the cache refresh to the tolerant shell
+  `apt-get update` the repo already uses, with `failed_when` scoped to a Nexus-source
+  error. See UPSTREAM_FIXES.
 - **PyPI** (billing_site) — pip installs Flask/Werkzeug/gunicorn + closure from
   `ng_pypi` (`billing_pip_extra_args` = `--index-url …/ng_pypi/simple --trusted-host`),
   all 11 wheels verified present in Nexus.

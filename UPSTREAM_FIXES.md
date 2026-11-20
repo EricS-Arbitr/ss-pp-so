@@ -3313,3 +3313,29 @@ Hostname stays at factory `pfSense.home.arpa` because the platform's hostname-vi
 3. **Wait for the platform fix** — preferred, since options 1 and 2 each introduce other maintenance burden.
 
 Per the status update at the top of this entry (2026-07-08), every fresh-range deploy since 2026-07-02 has been unaffected. Retain the reproducer methodology (minimal blueprint, 3-MAC sequential pattern as diagnostic evidence) in case this recurs with a future image variant.
+
+---
+
+## 2026-11-20 · enhancement · base image ships stale apt sources that break any early `apt-get update`
+
+**Symptom.** With the apt flip to the per-release Nexus repos, `nexus_apt`'s
+cache refresh (`ansible.builtin.apt` `update_cache: true`) failed on **every**
+Ubuntu host with the opaque `Failed to update apt cache: unknown reason`.
+
+**Cause (customer image, not our overlay).** The `RC_NG_Ansible` controller
+image ships stale `apt.puppet.com` / `apt.puppetlabs.com` sources with expired
+signing keys. `apt-get update` returns non-zero on those, and the Ansible apt
+module surfaces that as the generic "unknown reason". `roles/so_base` and
+`roles/so_apt_mirror` already document and work around this; `nexus_apt` hit it
+because it is the first thing in the deploy to run an *unconditional*
+`apt-get update` (the earlier `12-nexus-apt` only updated when it removed an old
+source, which never happened on a clean host).
+
+**Workaround (in `roles/nexus_apt`).** Refresh the cache with a tolerant shell
+`apt-get update` (the `so_base` pattern) after an apt/dpkg lock wait, with
+`failed_when` scoped to an `Err:` line for `range-registry` — so the unrelated
+stale third-party sources are tolerated while a genuine Nexus-source failure
+still fails loudly.
+
+**Upstream ask.** The base image should not ship third-party apt sources with
+expired keys; any consumer that runs `apt-get update` early inherits this.

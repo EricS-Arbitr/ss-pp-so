@@ -156,7 +156,7 @@ told to trust or skip-verify that host:
 | Malcolm 26.08.0 source | `ng_raw` (`installers/malcolm/…`) | `get_url` |
 | Ansible Galaxy collections | `ng_raw/galaxy` | `ansible-galaxy … --ignore-certs` (set in `deploy.sh`) |
 | Billing Python packages | `ng_pypi` | `pip --index-url … --trusted-host …` |
-| **apt packages + `docker-ce`** | **Ubuntu archive / `download.docker.com`** | **NOT Nexus.** `ng-apt` serves jammy+noble+plucky from one index; no pin can safely prefer the right release, so apt stays on upstream through the proxy. Sourcing apt from Nexus needs per-release repos. |
+| apt packages + `docker-ce` | `ng-apt-jammy-prod` / `ng-apt-noble-prod` (`range-registry`) | `nexus_apt` writes a per-release deb822 source (GPG `Signed-By`, pinned above `archive.ubuntu.com` which stays a fallback) + a per-host TLS-verify skip for the internal CA. |
 
 Before cutting a blueprint over to a Nexus-sourced tarball, confirm Nexus is
 populated and reachable through the proxy for that range — otherwise the deploy

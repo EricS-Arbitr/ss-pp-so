@@ -444,14 +444,17 @@ The build pulls its install media from the in-platform Nexus
 | Malcolm 26.08.0 source | `ng_raw` (`installers/malcolm/…`) |
 | Ansible Galaxy collections | `ng_raw/galaxy` |
 | Billing-portal Python packages | `ng_pypi` |
+| Ubuntu apt packages + `docker-ce` | `ng-apt-jammy-prod` / `ng-apt-noble-prod` (`range-registry`) |
 
-apt is the exception: base packages and `docker-ce` install from the Ubuntu
-archive and `download.docker.com` through the proxy, because the Nexus apt repo
-serves several Ubuntu releases from one index and no apt pin can safely prefer
-the right one.
+Ubuntu apt packages and `docker-ce` install from the per-release Nexus repos
+(`ng-apt-jammy-prod` / `ng-apt-noble-prod`, keyed to each host's codename),
+configured by the `nexus_apt` role; `archive.ubuntu.com` stays a lower-priority
+fallback. The repos are GPG-signed and `range-registry` presents the internal
+CA, so apt skips TLS verification for that host only — integrity still comes
+from the signature.
 
 Nexus presents an internal-CA certificate, so each fetcher that reaches it —
-`get_url`, `skopeo`, `ansible-galaxy`, `pip`, and dockerd — is configured to
+`get_url`, `apt`, `skopeo`, `ansible-galaxy`, `pip`, and dockerd — is configured to
 trust or skip-verify that host specifically. If a deploy fails early pulling the
 SO source or a Galaxy collection, confirm the controller can reach Nexus through
 the proxy before looking at the playbook.
