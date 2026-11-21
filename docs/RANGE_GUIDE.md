@@ -9,6 +9,9 @@ Security Onion, Active Directory, Ansible, and the SimSpace platform.
 Scope: this document covers the range. Security Onion is the SIEM; every log
 source on the range reports to it.
 
+For scenario framing, cyber key-terrain tiering and the intentional-vulnerability
+catalogue, see [`SCENARIO_AND_KEY_TERRAIN.md`](SCENARIO_AND_KEY_TERRAIN.md).
+
 ---
 
 ## At a glance
