@@ -1,0 +1,7 @@
+---
+# SOC hunt/analyst workstations (win-hunt-*) — managed Chrome bookmarks to the
+# range's security suite. ss-pp-so is Security Onion + Malcolm (no Splunk).
+browser_bookmarks_folder: "Security Suite"
+browser_bookmarks:
+  - { name: "Security Onion", url: "https://172.16.9.30" }        # so-manager SOC web
+  - { name: "Malcolm (OT DPI)", url: "https://192.168.90.130" }   # pp-ot-malcolm
